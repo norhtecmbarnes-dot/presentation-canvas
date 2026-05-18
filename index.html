@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas - AI Presentation Generator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Top Bar -->
+        <header id="topbar">
+            <div class="topbar-left">
+                <div class="logo">Canvas</div>
+                <div class="model-selector">
+                    <label for="provider-select">Provider:</label>
+                    <select id="provider-select">
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="zhipu">Zhipu (GLM)</option>
+                        <option value="custom">Custom API</option>
+                    </select>
+                    <label for="model-select">Model:</label>
+                    <select id="model-select"></select>
+                    <button id="refresh-models-btn" title="Refresh models">Refresh</button>
+                </div>
+            </div>
+            <div class="topbar-center">
+                <input type="text" id="presentation-title" placeholder="Presentation Title" value="Untitled Presentation">
+            </div>
+            <div class="topbar-right">
+                <button id="import-template-btn" title="Import template or presentation">Import</button>
+                <button id="export-template-btn" title="Export current slides as template">Export Template</button>
+                <button id="settings-btn" title="Settings">Settings</button>
+                <button id="export-pdf-btn" title="Export as PDF">PDF</button>
+                <button id="export-pptx-btn" title="Export as PPTX">PPTX</button>
+                <button id="present-btn" title="Present slides">Present</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div id="main-content">
+            <!-- Left Panel - Chat -->
+            <aside id="chat-panel">
+                <div id="chat-messages"></div>
+                <div id="mode-bar">
+                    <label>Mode:</label>
+                    <button class="mode-btn active" data-mode="generate" id="mode-generate-btn">Generate</button>
+                    <button class="mode-btn" data-mode="edit" id="mode-edit-btn">Edit</button>
+                    <label style="margin-left:8px;">Format:</label>
+                    <select id="gen-mode-select">
+                        <option value="script">Script</option>
+                        <option value="slides">Slides</option>
+                        <option value="markdown">Markdown</option>
+                    </select>
+                </div>
+                <div id="chat-input-area">
+                    <textarea id="chat-input" placeholder="Describe your presentation..." rows="3"></textarea>
+                    <div id="chat-btn-row">
+                        <button id="chat-send-btn" title="Send">Send</button>
+                        <button id="chat-stop-btn" title="Stop generation" style="display:none;">Stop</button>
+                        <button id="chat-regenerate-btn" title="Regenerate last response" style="display:none;">Retry</button>
+                    </div>
+                </div>
+                <div id="image-upload-area">
+                    <label for="image-upload">Upload Images:</label>
+                    <input type="file" id="image-upload" multiple accept="image/*">
+                    <div id="uploaded-images"></div>
+                </div>
+            </aside>
+
+            <!-- Center - Slide Editor / Preview -->
+            <main id="slide-workspace">
+                <div id="view-toggle">
+                    <button class="view-btn active" data-view="preview">Preview</button>
+                    <button class="view-btn" data-view="html">HTML</button>
+                </div>
+                <div id="slide-thumbnails"></div>
+                <div id="slide-canvas">
+                    <div id="slide-preview-area"></div>
+                    <div id="slide-html-area" style="display:none;">
+                        <textarea id="slide-html-editor" spellcheck="false"></textarea>
+                    </div>
+                </div>
+                <div id="slide-edit-bar">
+                    <button id="add-slide-btn" title="Add blank slide">+ Slide</button>
+                    <button id="delete-slide-btn" title="Delete current slide">Delete Slide</button>
+                    <button id="move-slide-up-btn" title="Move slide up">Move Up</button>
+                    <button id="move-slide-down-btn" title="Move slide down">Move Down</button>
+                    <button id="apply-html-btn" title="Apply HTML changes" style="display:none;">Apply HTML</button>
+                </div>
+            </main>
+
+            <!-- Right Panel - Slide Properties -->
+            <aside id="properties-panel">
+                <h3>Slide Properties</h3>
+                <div id="slide-props">
+                    <div class="prop-group">
+                        <label>Theme:</label>
+                        <select id="theme-select">
+                            <option value="dark">Dark</option>
+                            <option value="light">Light</option>
+                            <option value="blue">Blue</option>
+                            <option value="green">Green</option>
+                            <option value="red">Red</option>
+                        </select>
+                    </div>
+                    <div class="prop-group">
+                        <label>Layout:</label>
+                        <select id="layout-select">
+                            <option value="">-- Apply Layout --</option>
+                            <option value="title">Title Slide</option>
+                            <option value="title-content">Title + Content</option>
+                            <option value="two-column">Two Column</option>
+                            <option value="image-left">Image Left</option>
+                            <option value="image-right">Image Right</option>
+                            <option value="full-image">Full Image</option>
+                            <option value="blank">Blank</option>
+                        </select>
+                    </div>
+                    <div class="prop-group">
+                        <label>Transition:</label>
+                        <select id="transition-select">
+                            <option value="none">None</option>
+                            <option value="fade">Fade</option>
+                            <option value="slide">Slide</option>
+                            <option value="zoom">Zoom</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <h3>Templates</h3>
+                <div id="templates-list">
+                    <button class="template-btn" data-template="blank-presentation">Blank Presentation</button>
+                    <button class="template-btn" data-template="business-pitch">Business Pitch</button>
+                    <button class="template-btn" data-template="tech-overview">Tech Overview</button>
+                    <button class="template-btn" data-template="education">Education</button>
+                    <button class="template-btn" data-template="photo-gallery">Photo Gallery</button>
+                </div>
+                <hr>
+                <h3>Images</h3>
+                <div id="slide-images"></div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="settings-group">
+                <h3>Ollama</h3>
+                <label>Base URL:</label>
+                <input type="text" id="ollama-url" value="http://localhost:11434">
+            </div>
+            <div class="settings-group">
+                <h3>OpenAI</h3>
+                <label>API Key:</label>
+                <input type="password" id="openai-key" placeholder="sk-...">
+                <label>Base URL:</label>
+                <input type="text" id="openai-url" value="https://api.openai.com/v1">
+                <label>Model:</label>
+                <input type="text" id="openai-model" value="gpt-4o">
+            </div>
+            <div class="settings-group">
+                <h3>Zhipu (GLM)</h3>
+                <label>API Key:</label>
+                <input type="password" id="zhipu-key" placeholder="Your GLM API key">
+                <label>Model:</label>
+                <input type="text" id="zhipu-model" value="glm-4">
+            </div>
+            <div class="settings-group">
+                <h3>Custom API</h3>
+                <label>Base URL:</label>
+                <input type="text" id="custom-url" placeholder="http://your-api/v1">
+                <label>API Key:</label>
+                <input type="password" id="custom-key" placeholder="Your API key">
+                <label>Model:</label>
+                <input type="text" id="custom-model" placeholder="model-name">
+            </div>
+            <div class="settings-actions">
+                <button id="settings-save-btn">Save</button>
+                <button id="settings-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="import-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h2>Import</h2>
+            <div class="settings-group">
+                <h3>Import Template or Presentation</h3>
+                <label>Choose source type:</label>
+                <select id="import-source-select">
+                    <option value="template-json">Template (.json)</option>
+                    <option value="slides-html">HTML Slides (.html or .htm)</option>
+                    <option value="slides-markdown">Markdown Slides (.md)</option>
+                    <option value="clipboard">From Clipboard</option>
+                </select>
+                <div id="import-file-area" style="margin-top:12px;">
+                    <label for="import-file" style="cursor:pointer;display:inline-block;padding:10px 20px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);">Choose File</label>
+                    <input type="file" id="import-file" style="display:none;" accept=".json,.html,.htm,.md,.txt">
+                    <span id="import-file-name" style="margin-left:10px;color:var(--text-secondary);font-size:13px;">No file selected</span>
+                </div>
+                <div id="import-clipboard-area" style="display:none;margin-top:12px;">
+                    <label>Paste HTML or Markdown slides:</label>
+                    <textarea id="import-clipboard-text" rows="6" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);padding:10px;border-radius:4px;font-family:monospace;font-size:13px;" placeholder="Paste your content here..."></textarea>
+                </div>
+                <div style="margin-top:12px;">
+                    <label>
+                        <input type="checkbox" id="import-replace-checkbox" checked> Replace all current slides
+                    </label>
+                </div>
+            </div>
+            <div class="settings-actions">
+                <button id="import-confirm-btn">Import</button>
+                <button id="import-cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Presentation Mode -->
+    <div id="presentation-mode" style="display:none;">
+        <div id="presentation-slide"></div>
+        <div id="presentation-controls">
+            <button id="pres-prev-btn">Previous</button>
+            <span id="pres-counter">1 / 1</span>
+            <button id="pres-next-btn">Next</button>
+            <button id="pres-exit-btn">Exit</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="export.js"></script>
+</body>
+</html>
