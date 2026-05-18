@@ -155,6 +155,10 @@ p { font-size: 24px; color: #a0a0b0; }
         } catch (e) { }
         const currentId = localStorage.getItem('canvas_current_session');
         if (currentId) state.currentSessionId = currentId;
+        try {
+            localStorage.removeItem('canvas_slides');
+            localStorage.removeItem('canvas_chat_history');
+        } catch (e) { }
     }
 
     function saveSessions() {
@@ -178,8 +182,14 @@ p { font-size: 24px; color: #a0a0b0; }
         };
         state.sessions.unshift(session);
         state.currentSessionId = id;
+        state.chatHistory = [];
+        state.uploadedImages = [];
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.innerHTML = '';
         saveSessions();
         loadSessionIntoState(session);
+        addSlide(DEFAULT_SLIDE_HTML);
+        state.currentSlideIndex = 0;
         renderSessionList();
         return id;
     }
@@ -197,20 +207,22 @@ p { font-size: 24px; color: #a0a0b0; }
     }
 
     function loadSessionIntoState(session) {
-        state.slides = [...session.slides];
+        state.slides = [...(session.slides || [DEFAULT_SLIDE_HTML])];
         state.currentSlideIndex = session.currentSlideIndex || 0;
         state.currentTheme = session.theme || 'dark';
-        state.chatHistory = session.chatHistory || [];
+        state.chatHistory = [...(session.chatHistory || [])];
+        state.uploadedImages = [];
         document.getElementById('presentation-title').value = session.title || 'Untitled Presentation';
-        document.getElementById('chat-messages').innerHTML = '';
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.innerHTML = '';
         state.chatHistory.forEach(msg => {
-            const messagesDiv = document.getElementById('chat-messages');
             const msgEl = document.createElement('div');
             msgEl.className = `chat-msg ${msg.role}`;
             msgEl.textContent = msg.content;
             messagesDiv.appendChild(msgEl);
         });
-        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        setMode(state.currentMode);
     }
 
     function saveCurrentSession() {
@@ -278,16 +290,6 @@ p { font-size: 24px; color: #a0a0b0; }
                 return true;
             }
         }
-        try {
-            const saved = localStorage.getItem('canvas_slides');
-            if (saved) {
-                state.slides = JSON.parse(saved);
-                if (state.slides.length > 0) {
-                    createSession(document.getElementById('presentation-title').value || 'Migrated Presentation');
-                    return true;
-                }
-            }
-        } catch (e) { }
         return false;
     }
 
@@ -457,7 +459,9 @@ p { font-size: 24px; color: #a0a0b0; }
         msg.textContent = content;
         messagesDiv.appendChild(msg);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        state.chatHistory.push({ role, content });
+        if (role === 'user' || role === 'assistant') {
+            state.chatHistory.push({ role, content });
+        }
     }
 
     function addSystemMessage(content) {
