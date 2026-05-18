@@ -763,50 +763,160 @@ p { font-size: 24px; color: #a0a0b0; }
 
     function getSlideSystemPrompt(mode) {
         const theme = SLIDE_THEMES[state.currentTheme];
-        const basePrompt = `You are an expert presentation creator. You create beautiful, professional HTML slides.
+        const exampleSlide = `<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', sans-serif; background: ${theme.background}; color: ${theme.color}; }
+.container { text-align: center; padding: 60px; }
+h1 { font-size: 48px; margin-bottom: 16px; color: ${theme.h1Color}; }
+p { font-size: 24px; color: ${theme.color}; opacity: 0.8; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Presentation Title</h1>
+    <p>Subtitle or tagline here</p>
+</div>
+</body>
+</html>`;
 
-CRITICAL RULES:
-- Each slide MUST be a COMPLETE, standalone HTML document with <!DOCTYPE html>, <html>, <head>, <style>, and <body> tags.
-- Do NOT use any external CSS frameworks or JavaScript libraries. All styling must be inline or in <style> tags.
-- Do NOT use external images unless the user provides them. Use CSS for decorations and visual elements.
-- Each slide should be 960px wide and 540px tall (16:9 aspect ratio).
-- Use modern, clean design principles.
-- Ensure text is readable and well-spaced.
-- Use the theme colors: background="${theme.background}", text color="${theme.color}", accent="${theme.accent}", h1="${theme.h1Color}", h2="${theme.h2Color}".
-- Make slides visually engaging with gradients, shapes, and typography.`;
+        const basePrompt = `You are a professional presentation designer. You create slides as complete, standalone HTML documents.
+
+SLIDE FORMAT — EVERY SLIDE MUST FOLLOW THIS EXACT STRUCTURE:
+
+Each slide is a COMPLETE HTML document. Here is an example of the EXACT format you must produce:
+
+${exampleSlide}
+
+MANDATORY RULES:
+1. EVERY slide MUST start with <!DOCTYPE html> and end with </html>
+2. EVERY slide MUST have <html>, <head> with <style> tags, and <body> tags
+3. ALL CSS must be inside a <style> tag in the <head>. NEVER use external stylesheets, <link> tags, or JavaScript.
+4. Use ONLY these theme colors: background="${theme.background}" text="${theme.color}" accent="${theme.accent}" h1="${theme.h1Color}" h2="${theme.h2Color}"
+5. Each slide is 960px wide by 540px tall (16:9 aspect ratio). Set min-height: 100vh on the body.
+6. Wrap EACH slide with these EXACT markers on their OWN lines:
+<<<SLIDE>>>
+(the complete HTML document here)
+<<<END_SLIDE>>>
+
+7. Do NOT wrap slides in markdown code blocks. Do NOT use triple-backtick html or any other fencing.
+8. Do NOT include any commentary, explanation, or text outside the <<<SLIDE>>> / <<<END_SLIDE>>> markers.
+9. Each <<<SLIDE>>> marker MUST be immediately followed by <!DOCTYPE html>
+10. Each <<<END_SLIDE>>> marker MUST be immediately after the closing </html> tag
+11. Produce AT LEAST the number of slides requested. More is fine, fewer is not.
+12. Make slides visually appealing: use flexbox/grid for layouts, gradients, rounded corners, proper spacing.
+13. Use meaningful placeholder content, NOT lorem ipsum. Write real content about the topic.`;
 
         if (mode === 'script') {
-            return basePrompt + `\n\nYou are in SCRIPT mode. The user will describe a topic, and you must:
-1. Plan the presentation by outlining slide titles and key points.
-2. Then generate each slide as a complete HTML document.
-3. Output each slide wrapped in <<<SLIDE>>> at the start and <<<END_SLIDE>>> at the end.
-4. You may include brief commentary between slides explaining your design choices.`;
+            return basePrompt + `
+
+You are in SCRIPT mode. First outline the presentation structure, then generate all slides.
+
+OUTPUT FORMAT — follow this EXACT structure:
+
+First, output a brief outline:
+Slide 1: [Title]
+Slide 2: [Title]
+...
+
+Then generate each slide wrapped in markers:
+
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+...
+</html>
+<<<END_SLIDE>>>
+
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+...
+</html>
+<<<END_SLIDE>>>`;
         } else if (mode === 'markdown') {
-            return basePrompt + `\n\nYou are in MARKDOWN mode. Generate slide content using markdown with ---SLIDE--- separators:
+            return basePrompt + `
+
+You are in MARKDOWN mode. First outline the slides in markdown, then convert ALL of them to complete HTML slides.
+
+OUTPUT FORMAT:
 
 ---SLIDE---
-# Title
+# Slide Title Here
+- Key point one
+- Key point two
+---SLIDE---
+## Second Slide Title
 Content here
 ---SLIDE---
 
-Then also generate the complete HTML for each slide wrapped in <<<SLIDE>>> and <<<END_SLIDE>>> markers.`;
+After the markdown outline, produce EVERY slide as complete HTML:
+
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+...
+</html>
+<<<END_SLIDE>>>
+
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+...
+</html>
+<<<END_SLIDE>>>`;
         } else {
-            return basePrompt + `\n\nYou are in SLIDES mode. Generate complete slide HTML documents directly.
-Output each slide wrapped in <<<SLIDE>>> at the start and <<<END_SLIDE>>> at the end.`;
+            return basePrompt + `
+
+You are in SLIDES mode. Generate complete slide HTML documents directly.
+
+OUTPUT FORMAT — produce slides like this:
+
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+<head>
+<style>* { margin: 0; padding: 0; box-sizing: border-box; } ... </style>
+</head>
+<body>... slide content ...</body>
+</html>
+<<<END_SLIDE>>>
+
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+<head>
+<style>...</style>
+</head>
+<body>...</body>
+</html>
+<<<END_SLIDE>>>
+
+IMPORTANT: Output NOTHING except the <<<SLIDE>>>/<<<END_SLIDE>>> wrapped slide documents. No explanations, no markdown, no code blocks.`;
         }
     }
 
     function getEditSystemPrompt() {
         const theme = SLIDE_THEMES[state.currentTheme];
-        return `You are an expert slide editor. The user wants to modify an existing slide.
+        return `You are editing an existing presentation slide. The user wants a specific change.
 
 RULES:
-- Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head>, <style>, and <body> tags.
-- Do NOT use external CSS frameworks or JavaScript libraries.
-- Each slide should be 960px wide and 540px tall.
-- Use the theme colors: background="${theme.background}", text color="${theme.color}", accent="${theme.accent}", h1="${theme.h1Color}", h2="${theme.h2Color}".
-- Wrap the modified slide in <<<SLIDE>>> and <<<END_SLIDE>>> markers.
-- Only change what the user asks you to change, keep the rest intact.`;
+1. Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head>, <style>, and <body> tags.
+2. ALL CSS must be in a <style> tag, no external resources.
+3. Use these theme colors: background="${theme.background}" text="${theme.color}" accent="${theme.accent}" h1="${theme.h1Color}" h2="${theme.h2Color}"
+4. Keep the slide at 960x540 (16:9) aspect ratio with min-height: 100vh on body.
+5. Wrap the ENTIRE modified slide in these EXACT markers, each on its own line:
+<<<SLIDE>>>
+<!DOCTYPE html>
+<html>
+...
+</html>
+<<<END_SLIDE>>>
+
+6. Output ONLY the <<<SLIDE>>>/<<<END_SLIDE>>> wrapped HTML. No explanations, no markdown, no code blocks.
+7. Make ONLY the changes the user requested. Preserve everything else exactly as-is.`;
     }
 
     function parseSlidesFromResponse(response) {
