@@ -113,6 +113,7 @@ p { font-size: 24px; color: #a0a0b0; }
         slides: [],
         currentSlideIndex: 0,
         uploadedImages: [],
+        logo: null,
         chatHistory: [],
         isGenerating: false,
         abortController: null,
@@ -389,8 +390,18 @@ p { font-size: 24px; color: #a0a0b0; }
     function renderUploadedImages() {
         const container = document.getElementById('uploaded-images');
         const slideImages = document.getElementById('slide-images');
+        const noImagesHint = document.getElementById('no-images-hint');
+        const imageCountBadge = document.getElementById('image-count-badge');
         container.innerHTML = '';
         slideImages.innerHTML = '';
+
+        if (state.uploadedImages.length === 0) {
+            if (noImagesHint) noImagesHint.style.display = 'block';
+            if (imageCountBadge) imageCountBadge.textContent = '';
+        } else {
+            if (noImagesHint) noImagesHint.style.display = 'none';
+            if (imageCountBadge) imageCountBadge.textContent = `(${state.uploadedImages.length})`;
+        }
 
         state.uploadedImages.forEach((img, idx) => {
             const thumb = document.createElement('div');
@@ -400,7 +411,8 @@ p { font-size: 24px; color: #a0a0b0; }
 
             const item = document.createElement('div');
             item.className = 'slide-image-item';
-            item.innerHTML = `<img src="${img.data}" alt="${img.name}"><span class="image-name">${img.name}</span><button class="add-to-slide-btn" data-idx="${idx}">Add</button>`;
+            const slideNum = state.currentSlideIndex + 1;
+            item.innerHTML = `<img src="${img.data}" alt="${img.name}"><span class="image-name">${img.name}</span><button class="to-slide-btn" data-idx="${idx}" title="Insert into slide ${slideNum}">To Slide ${slideNum}</button>`;
             slideImages.appendChild(item);
         });
 
@@ -412,13 +424,15 @@ p { font-size: 24px; color: #a0a0b0; }
             });
         });
 
-        slideImages.querySelectorAll('.add-to-slide-btn').forEach(btn => {
+        slideImages.querySelectorAll('.to-slide-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const idx = parseInt(e.target.dataset.idx);
                 const img = state.uploadedImages[idx];
                 addImageToCurrentSlide(img);
             });
         });
+
+        renderLogoPreview();
     }
 
     function addImageToCurrentSlide(img) {
@@ -427,9 +441,86 @@ p { font-size: 24px; color: #a0a0b0; }
         const imgTag = `<img src="${img.data}" style="max-width:80%;max-height:60vh;display:block;margin:20px auto;border-radius:8px;" alt="${img.name}">`;
         const updated = currentHtml.replace('</body>', `${imgTag}</body>`);
         state.slides[state.currentSlideIndex] = updated;
-        saveSlides();
+        saveCurrentSession();
         renderSlidePreview();
         renderThumbnails();
+    }
+
+    function loadLogo() {
+        try {
+            const saved = localStorage.getItem('canvas_logo');
+            if (saved) state.logo = JSON.parse(saved);
+        } catch (e) { }
+    }
+
+    function saveLogo() {
+        if (state.logo) {
+            localStorage.setItem('canvas_logo', JSON.stringify(state.logo));
+        } else {
+            localStorage.removeItem('canvas_logo');
+        }
+    }
+
+    function renderLogoPreview() {
+        const preview = document.getElementById('logo-preview');
+        const previewImg = document.getElementById('logo-preview-img');
+        if (!preview || !previewImg) return;
+
+        if (state.logo) {
+            preview.style.display = 'block';
+            previewImg.src = state.logo.data;
+            document.getElementById('logo-position').value = state.logo.position || 'bottom-right';
+            document.getElementById('logo-size').value = state.logo.size || '90';
+        } else {
+            preview.style.display = 'none';
+        }
+    }
+
+    function applyLogoToAllSlides() {
+        if (!state.logo || state.slides.length === 0) return;
+
+        const position = document.getElementById('logo-position').value;
+        const size = parseInt(document.getElementById('logo-size').value);
+        state.logo.position = position;
+        state.logo.size = size;
+        saveLogo();
+
+        const posStyles = {
+            'top-left': 'top:16px;left:16px;',
+            'top-right': 'top:16px;right:16px;',
+            'bottom-left': 'bottom:16px;left:16px;',
+            'bottom-right': 'bottom:16px;right:16px;'
+        };
+        const posStyle = posStyles[position] || posStyles['bottom-right'];
+
+        const logoHtml = `<img src="${state.logo.data}" style="position:absolute;${posStyle}width:${size}px;height:auto;z-index:999;pointer-events:none;" alt="Logo" class="canvas-logo">`;
+
+        state.slides = state.slides.map(html => {
+            let updated = html.replace(/<img[^>]*class="canvas-logo"[^>]*>/g, '');
+            updated = updated.replace('</body>', `${logoHtml}</body>`);
+            if (!updated.includes('position:relative') && !updated.includes('position: relative')) {
+                updated = updated.replace('<body', '<body style="position:relative;"');
+            }
+            return updated;
+        });
+
+        saveCurrentSession();
+        renderSlidePreview();
+        renderThumbnails();
+    }
+
+    function removeLogoFromAllSlides() {
+        state.logo = null;
+        saveLogo();
+
+        state.slides = state.slides.map(html => {
+            return html.replace(/<img[^>]*class="canvas-logo"[^>]*>/g, '');
+        });
+
+        saveCurrentSession();
+        renderSlidePreview();
+        renderThumbnails();
+        renderLogoPreview();
     }
 
     function renderAll() {
@@ -762,12 +853,17 @@ p { font-size: 24px; color: #a0a0b0; }
     }
 
     function getImageContext() {
-        if (state.uploadedImages.length === 0) return '';
-        let context = '\n\nThe user has uploaded the following images that can be referenced in slides:\n';
-        state.uploadedImages.forEach((img, i) => {
-            context += `- Image ${i + 1}: "${img.name}" (${img.width}x${img.height})\n`;
-        });
-        context += '\nTo embed an uploaded image in a slide, use an <img> tag with the src starting with "data:image/..." and include the full base64 data.';
+        let context = '';
+        if (state.uploadedImages.length > 0) {
+            context += '\n\nThe user has uploaded the following images that can be embedded in slides:\n';
+            state.uploadedImages.forEach((img, i) => {
+                context += `- Image ${i + 1}: "${img.name}" (${img.width}x${img.height}) — src="${img.data.substring(0, 80)}..."\n`;
+            });
+            context += 'To embed an image, use <img src="FULL_BASE64_DATA" style="max-width:80%;max-height:60vh;display:block;margin:20px auto;border-radius:8px;">. You MUST include the complete base64 data URI from above.\n';
+        }
+        if (state.logo) {
+            context += '\n\nA logo has been uploaded for this presentation. It will be automatically added to all slides, so do NOT include it in your slide HTML.\n';
+        }
         return context;
     }
 
@@ -1420,6 +1516,22 @@ body { background: #111; overflow: hidden; }
             e.target.value = '';
         });
 
+        document.getElementById('logo-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                state.logo = { data: ev.target.result, name: file.name, position: 'bottom-right', size: 90 };
+                saveLogo();
+                renderLogoPreview();
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        });
+
+        document.getElementById('logo-apply-btn').addEventListener('click', applyLogoToAllSlides);
+        document.getElementById('logo-remove-btn').addEventListener('click', removeLogoFromAllSlides);
+
         document.querySelectorAll('.view-btn').forEach(btn => {
             btn.addEventListener('click', () => switchView(btn.dataset.view));
         });
@@ -1576,6 +1688,7 @@ body { background: #111; overflow: hidden; }
     function init() {
         loadSettings();
         loadSessions();
+        loadLogo();
         if (state.sessions.length === 0) {
             createSession('Welcome Presentation');
         } else {

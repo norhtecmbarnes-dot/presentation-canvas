@@ -646,14 +646,122 @@ body {
     white-space: nowrap;
 }
 
-.slide-image-item .add-to-slide-btn {
+.slide-image-item .to-slide-btn {
     background: var(--accent);
     color: var(--bg-primary);
     border: none;
-    padding: 3px 8px;
+    padding: 3px 10px;
     border-radius: 3px;
     cursor: pointer;
     font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.slide-image-item .to-slide-btn:hover {
+    background: var(--accent-hover);
+}
+
+#image-count-badge {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+#no-images-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+}
+
+/* ===== LOGO ===== */
+#logo-area {
+    padding: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+}
+
+#logo-area h4 {
+    margin: 0 0 8px 0;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.logo-upload-label {
+    display: inline-block;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border);
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 11px;
+    transition: all 0.15s;
+}
+
+.logo-upload-label:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+#logo-preview {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#logo-preview-img {
+    max-width: 80px;
+    max-height: 40px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+
+#logo-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+#logo-controls select {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+#logo-apply-btn {
+    background: #66bb6a;
+    color: #fff;
+    border: none;
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+#logo-apply-btn:hover {
+    background: #4caf50;
+}
+
+#logo-remove-btn {
+    background: none;
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+#logo-remove-btn:hover {
+    background: rgba(239, 83, 80, 0.1);
 }
 
 /* ===== MODAL ===== */

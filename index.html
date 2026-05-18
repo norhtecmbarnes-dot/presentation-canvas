@@ -75,6 +75,29 @@
                     <input type="file" id="image-upload" multiple accept="image/*">
                     <div id="uploaded-images"></div>
                 </div>
+                <div id="logo-area">
+                    <h4>Logo</h4>
+                    <label for="logo-upload" class="logo-upload-label">+ Upload Logo</label>
+                    <input type="file" id="logo-upload" accept="image/*" style="display:none;">
+                    <div id="logo-preview" style="display:none;">
+                        <img id="logo-preview-img" alt="Logo">
+                        <div id="logo-controls">
+                            <select id="logo-position">
+                                <option value="top-left">Top Left</option>
+                                <option value="top-right">Top Right</option>
+                                <option value="bottom-left">Bottom Left</option>
+                                <option value="bottom-right" selected>Bottom Right</option>
+                            </select>
+                            <select id="logo-size">
+                                <option value="60">Small</option>
+                                <option value="90" selected>Medium</option>
+                                <option value="130">Large</option>
+                            </select>
+                            <button id="logo-apply-btn" title="Apply logo to all slides">Apply</button>
+                            <button id="logo-remove-btn" title="Remove logo from all slides">Remove</button>
+                        </div>
+                    </div>
+                </div>
             </aside>
 
             <!-- Center - Slide Editor / Preview -->
@@ -140,8 +163,9 @@
                 <h3>Templates</h3>
                 <div id="templates-list"></div>
                 <hr>
-                <h3>Images</h3>
+                <h3>Images <span id="image-count-badge"></span></h3>
                 <div id="slide-images"></div>
+                <p id="no-images-hint" style="display:none;font-size:12px;color:var(--text-secondary);margin-top:8px;">Upload images in the chat panel, then use "To Slide" to place them.</p>
             </aside>
         </div>
     </div>
