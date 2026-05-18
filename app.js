@@ -560,10 +560,10 @@ p { font-size: 24px; color: #a0a0b0; }
         state.abortController = new AbortController();
 
         try {
-            if (provider === 'ollama') return await sendToOllama(prompt, systemPrompt, model);
-            else if (provider === 'openai') return await sendToOpenAI(prompt, systemPrompt, model);
-            else if (provider === 'zhipu') return await sendToZhipu(prompt, systemPrompt, model);
-            else if (provider === 'custom') return await sendToCustom(prompt, systemPrompt, model);
+            if (provider === 'ollama') return await streamOllama(prompt, systemPrompt, model);
+            else if (provider === 'openai') return await streamOpenAICompat(state.settings.openaiUrl, state.settings.openaiKey, prompt, systemPrompt, model);
+            else if (provider === 'zhipu') return await streamOpenAICompat('https://open.bigmodel.cn/api/paas/v4/chat/completions', `Bearer ${state.settings.zhipuKey}`, prompt, systemPrompt, model);
+            else if (provider === 'custom') return await streamOpenAICompat(state.settings.customUrl, state.settings.customKey ? `Bearer ${state.settings.customKey}` : null, prompt, systemPrompt, model);
         } catch (e) {
             if (e.name === 'AbortError') {
                 addSystemMessage('Generation stopped.');
@@ -587,50 +587,91 @@ p { font-size: 24px; color: #a0a0b0; }
         return messages;
     }
 
-    async function sendToOllama(prompt, systemPrompt, model) {
+    async function streamOllama(prompt, systemPrompt, model) {
         const response = await fetch(`${state.settings.ollamaUrl}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
+            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: true }),
             signal: state.abortController.signal
         });
-        const data = await response.json();
-        return data.message?.content || '';
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                try {
+                    const json = JSON.parse(line);
+                    if (json.message?.content) {
+                        fullContent += json.message.content;
+                        if (state.onStreamToken) state.onStreamToken(fullContent);
+                    }
+                } catch (e) { }
+            }
+        }
+
+        return fullContent;
     }
 
-    async function sendToOpenAI(prompt, systemPrompt, model) {
-        const response = await fetch(`${state.settings.openaiUrl}/chat/completions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.settings.openaiKey}` },
-            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
-            signal: state.abortController.signal
-        });
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
-    }
-
-    async function sendToZhipu(prompt, systemPrompt, model) {
-        const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.settings.zhipuKey}` },
-            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
-            signal: state.abortController.signal
-        });
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
-    }
-
-    async function sendToCustom(prompt, systemPrompt, model) {
+    async function streamOpenAICompat(baseUrl, authHeader, prompt, systemPrompt, model) {
         const headers = { 'Content-Type': 'application/json' };
-        if (state.settings.customKey) headers['Authorization'] = `Bearer ${state.settings.customKey}`;
-        const response = await fetch(`${state.settings.customUrl}/chat/completions`, {
+        if (authHeader) headers['Authorization'] = authHeader;
+
+        const isZhipu = baseUrl.includes('bigmodel.cn');
+        const url = isZhipu ? baseUrl : (baseUrl.endsWith('/chat/completions') ? baseUrl : baseUrl + '/chat/completions');
+
+        const response = await fetch(url, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
+            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: true }),
             signal: state.abortController.signal
         });
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API error ${response.status}: ${errText.substring(0, 200)}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith('data:')) continue;
+                const data = trimmed.slice(5).trim();
+                if (data === '[DONE]') continue;
+
+                try {
+                    const json = JSON.parse(data);
+                    const delta = json.choices?.[0]?.delta?.content;
+                    if (delta) {
+                        fullContent += delta;
+                        if (state.onStreamToken) state.onStreamToken(fullContent);
+                    }
+                } catch (e) { }
+            }
+        }
+
+        return fullContent;
     }
 
     function getImageContext() {
@@ -758,9 +799,7 @@ RULES:
 
         if (!isFirstSlide && state.slides.length > 0) {
             const choice = confirm('You already have slides. Do you want to:\n\nOK = Replace all slides with new presentation\nCancel = Add new slides to the end');
-            if (!choice) {
-                // append mode - continue below
-            } else {
+            if (choice) {
                 state.slides = [];
             }
         }
@@ -773,37 +812,71 @@ RULES:
         sendBtn.style.display = 'none';
         stopBtn.style.display = '';
 
+        const streamMsg = document.createElement('div');
+        streamMsg.className = 'chat-msg assistant';
+        document.getElementById('chat-messages').appendChild(streamMsg);
+
+        let lastParsedCount = 0;
+        let allParsedSlides = [];
+
+        state.onStreamToken = (fullContent) => {
+            const slides = parseSlidesFromResponse(fullContent);
+            const newSlides = slides.slice(lastParsedCount);
+
+            for (const slideHtml of newSlides) {
+                allParsedSlides.push(slideHtml);
+                state.slides.push(slideHtml);
+                state.currentSlideIndex = state.slides.length - 1;
+                lastParsedCount = allParsedSlides.length;
+                saveSlides();
+                renderAll();
+            }
+
+            if (allParsedSlides.length > 0) {
+                streamMsg.textContent = `Generating slide ${allParsedSlides.length}...`;
+            } else {
+                streamMsg.innerHTML = '<span class="loading-dots">Generating</span>';
+            }
+            document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+        };
+
         try {
             const mode = document.getElementById('gen-mode-select').value;
             const systemPrompt = getSlideSystemPrompt(mode) + getImageContext();
 
-            const loadingMsg = document.createElement('div');
-            loadingMsg.className = 'chat-msg assistant';
-            loadingMsg.innerHTML = '<span class="loading-dots">Generating</span>';
-            document.getElementById('chat-messages').appendChild(loadingMsg);
-            document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
-
             const response = await sendToLLM(prompt, systemPrompt);
 
-            document.getElementById('chat-messages').removeChild(loadingMsg);
+            state.onStreamToken = null;
 
             if (response) {
                 const parsedSlides = parseSlidesFromResponse(response);
+                const finalCount = parsedSlides.length;
+                const alreadyAdded = allParsedSlides.length;
 
-                if (parsedSlides.length > 0) {
-                    state.slides = state.slides.concat(parsedSlides);
+                if (finalCount > alreadyAdded) {
+                    const remaining = parsedSlides.slice(alreadyAdded);
+                    for (const slideHtml of remaining) {
+                        state.slides.push(slideHtml);
+                    }
+                }
+
+                if (finalCount > 0) {
                     state.currentSlideIndex = 0;
                     saveSlides();
                     renderAll();
-
-                    addChatMessage('assistant', `Generated ${parsedSlides.length} slide(s). You now have ${state.slides.length} total slides. Switch to Edit mode to make changes.`);
+                    streamMsg.textContent = `Done. Generated ${finalCount} slide(s). Switch to Edit mode to make changes.`;
                 } else {
-                    addChatMessage('assistant', 'Could not parse slides from the response. Try rephrasing or using a different generation mode.');
+                    streamMsg.textContent = 'Could not parse slides from the response. Try rephrasing or using a different generation mode.';
                 }
+            } else {
+                streamMsg.textContent = allParsedSlides.length > 0
+                    ? `Stopped after ${allParsedSlides.length} slide(s).`
+                    : 'Generation cancelled.';
             }
         } catch (e) {
+            state.onStreamToken = null;
             if (e.name !== 'AbortError') {
-                addErrorMessage(`Error: ${e.message}`);
+                streamMsg.textContent = `Error: ${e.message}`;
             }
         } finally {
             state.isGenerating = false;
@@ -811,6 +884,7 @@ RULES:
             sendBtn.style.display = '';
             stopBtn.style.display = 'none';
             state.abortController = null;
+            state.onStreamToken = null;
         }
     }
 
@@ -834,33 +908,50 @@ RULES:
         sendBtn.style.display = 'none';
         stopBtn.style.display = '';
 
+        const streamMsg = document.createElement('div');
+        streamMsg.className = 'chat-msg assistant';
+        streamMsg.innerHTML = '<span class="loading-dots">Editing slide</span>';
+        document.getElementById('chat-messages').appendChild(streamMsg);
+
+        let editSlideReceived = false;
+
+        state.onStreamToken = (fullContent) => {
+            const slides = parseSlidesFromResponse(fullContent);
+            if (slides.length > 0) {
+                state.slides[state.currentSlideIndex] = slides[slides.length - 1];
+                editSlideReceived = true;
+                saveSlides();
+                renderAll();
+                streamMsg.textContent = 'Applying changes...';
+            }
+            document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+        };
+
         try {
             const currentSlide = state.slides[state.currentSlideIndex];
             const editPrompt = `Here is the current slide HTML (slide ${state.currentSlideIndex + 1} of ${state.slides.length}):\n\n${currentSlide}\n\nUser request: ${prompt}\n\nPlease return the modified slide HTML wrapped in <<<SLIDE>>> and <<<END_SLIDE>>> markers.`;
 
-            const loadingMsg = document.createElement('div');
-            loadingMsg.className = 'chat-msg assistant';
-            loadingMsg.innerHTML = '<span class="loading-dots">Editing slide</span>';
-            document.getElementById('chat-messages').appendChild(loadingMsg);
-
             const response = await sendToLLM(editPrompt, getEditSystemPrompt());
 
-            document.getElementById('chat-messages').removeChild(loadingMsg);
+            state.onStreamToken = null;
 
             if (response) {
                 const parsedSlides = parseSlidesFromResponse(response);
                 if (parsedSlides.length > 0) {
-                    state.slides[state.currentSlideIndex] = parsedSlides[0];
+                    state.slides[state.currentSlideIndex] = parsedSlides[parsedSlides.length - 1];
                     saveSlides();
                     renderAll();
-                    addChatMessage('assistant', 'Slide updated successfully.');
+                    streamMsg.textContent = 'Slide updated successfully.';
+                } else if (editSlideReceived) {
+                    streamMsg.textContent = 'Slide updated successfully.';
                 } else {
-                    addChatMessage('assistant', 'Could not parse the edited slide. Try being more specific.');
+                    streamMsg.textContent = 'Could not parse the edited slide. Try being more specific.';
                 }
             }
         } catch (e) {
+            state.onStreamToken = null;
             if (e.name !== 'AbortError') {
-                addErrorMessage(`Error: ${e.message}`);
+                streamMsg.textContent = `Error: ${e.message}`;
             }
         } finally {
             state.isGenerating = false;
@@ -868,6 +959,7 @@ RULES:
             sendBtn.style.display = '';
             stopBtn.style.display = 'none';
             state.abortController = null;
+            state.onStreamToken = null;
         }
     }
 
