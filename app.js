@@ -257,12 +257,16 @@ p { font-size: 24px; color: #a0a0b0; }
         container.innerHTML = '';
         state.sessions.forEach(session => {
             const item = document.createElement('div');
-            item.className = 'session-item' + (session.id === state.currentSessionId ? ' active' : '');
+            item.className = 'session-item' + (session.id === state.currentSessionId ? ' active' : '') + (session.archived ? ' archived' : '');
             const date = new Date(session.updatedAt || session.createdAt);
             const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            item.innerHTML = `<div class="session-item-title">${escapeHtml(session.title || 'Untitled')}</div><div class="session-item-meta">${session.slides ? session.slides.length : 0} slides | ${timeStr}</div><button class="session-item-delete" data-id="${session.id}" title="Delete">&times;</button>`;
+            const slideCount = session.slides ? session.slides.length : 0;
+            const isDefault = (slideCount === 1 && session.slides && session.slides[0] === DEFAULT_SLIDE_HTML);
+            const badge = session.archived ? '<span class="session-badge archived-badge">saved</span>' : '';
+            const downloadBtn = (!isDefault || session.archived) ? `<button class="session-item-download" data-id="${session.id}" title="Download HTML">&#8595;</button>` : '';
+            item.innerHTML = `<div class="session-item-title">${escapeHtml(session.title || 'Untitled')}</div><div class="session-item-meta">${badge}${slideCount} slides | ${timeStr}</div><div class="session-item-actions">${downloadBtn}<button class="session-item-delete" data-id="${session.id}" title="Delete">&times;</button></div>`;
             item.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('session-item-delete')) {
+                if (!e.target.classList.contains('session-item-delete') && !e.target.classList.contains('session-item-download')) {
                     switchSession(session.id);
                 }
             });
@@ -272,6 +276,12 @@ p { font-size: 24px; color: #a0a0b0; }
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 deleteSession(btn.dataset.id);
+            });
+        });
+        container.querySelectorAll('.session-item-download').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadSessionHTML(btn.dataset.id);
             });
         });
     }
@@ -942,6 +952,47 @@ RULES (NEVER BREAK THESE):
         });
     }
 
+    function archiveCurrentSession() {
+        saveCurrentSession();
+        const session = state.sessions.find(s => s.id === state.currentSessionId);
+        if (!session) return;
+        const isDefault = (session.slides.length === 1 && session.slides[0] === DEFAULT_SLIDE_HTML);
+        if (isDefault) return;
+        session.archived = true;
+        saveSessions();
+        renderSessionList();
+    }
+
+    function downloadSessionHTML(sessionId) {
+        const session = state.sessions.find(s => s.id === sessionId);
+        if (!session || !session.slides || session.slides.length === 0) return;
+        const title = session.title || 'Untitled';
+        let html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(title)}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; overflow: hidden; }
+.slide { width: 960px; height: 540px; page-break-after: always; }
+</style>
+</head>
+<body>
+`;
+        session.slides.forEach((slide, i) => {
+            html += `<div class="slide"><iframe srcdoc="${escapeHtml(slide)}" width="960" height="540" style="border:none;"></iframe></div>\n`;
+        });
+        html += `</body>\n</html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = title.replace(/[^a-z0-9]/gi, '_') + '.html';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
     async function handleGenerate() {
         const input = document.getElementById('chat-input');
         const sendBtn = document.getElementById('chat-send-btn');
@@ -953,12 +1004,9 @@ RULES (NEVER BREAK THESE):
         const isDefault = (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML);
 
         if (!isDefault && state.slides.length > 0) {
-            const choice = confirm('You already have slides. Do you want to:\n\nOK = Replace all slides (new presentation)\nCancel = Add new slides to the end');
-            if (choice) {
-                state.slides = [];
-                state.chatHistory = [];
-                document.getElementById('chat-messages').innerHTML = '';
-            }
+            archiveCurrentSession();
+            const newTitle = prompt.length > 50 ? prompt.substring(0, 50) + '...' : prompt;
+            createSession(newTitle);
         }
 
         addChatMessage('user', prompt);

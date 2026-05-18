@@ -929,9 +929,6 @@ body {
 }
 
 .session-item-delete {
-    position: absolute;
-    top: 8px;
-    right: 8px;
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -939,8 +936,7 @@ body {
     font-size: 14px;
     padding: 2px 6px;
     border-radius: 3px;
-    opacity: 0;
-    transition: opacity 0.15s;
+    transition: opacity 0.15s, color 0.15s;
 }
 
 .session-item:hover .session-item-delete {
@@ -950,6 +946,57 @@ body {
 .session-item-delete:hover {
     color: var(--danger);
     background: rgba(239, 83, 80, 0.1);
+}
+
+.session-item-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.session-item-download {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    transition: all 0.15s;
+}
+
+.session-item-download:hover {
+    color: var(--accent);
+    background: rgba(79, 195, 247, 0.1);
+}
+
+.session-item.archived {
+    border-left: 3px solid #66bb6a;
+}
+
+.session-item.archived .session-item-title {
+    opacity: 0.85;
+}
+
+.session-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    vertical-align: middle;
+}
+
+.archived-badge {
+    background: rgba(102, 187, 106, 0.15);
+    color: #66bb6a;
 }
 
 #sidebar-toggle-btn {
