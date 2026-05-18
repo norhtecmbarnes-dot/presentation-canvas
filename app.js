@@ -484,11 +484,21 @@ p { font-size: 24px; color: #a0a0b0; }
 
     async function fetchOllamaModels() {
         try {
-            const response = await fetch(`${state.settings.ollamaUrl}/api/tags`);
+            const response = await fetch(`${state.settings.ollamaUrl}/api/tags`, {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!response.ok) {
+                console.error('Ollama API error:', response.status, response.statusText);
+                addErrorMessage(`Failed to fetch Ollama models: HTTP ${response.status}. Make sure Ollama is running at ${state.settings.ollamaUrl}`);
+                return [];
+            }
             const data = await response.json();
-            return data.models.map(m => m.name) || [];
+            const models = data.models || [];
+            return models.map(m => m.name || m.model).filter(Boolean);
         } catch (e) {
             console.error('Failed to fetch Ollama models:', e);
+            addErrorMessage(`Could not connect to Ollama at ${state.settings.ollamaUrl}. Make sure Ollama is running. Error: ${e.message}`);
             return [];
         }
     }
