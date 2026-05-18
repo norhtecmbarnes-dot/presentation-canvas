@@ -488,9 +488,16 @@ p { font-size: 24px; color: #a0a0b0; }
             if (!overlay) {
                 overlay = document.createElement('div');
                 overlay.id = 'generation-overlay';
-                overlay.innerHTML = '<div class="gen-overlay-content"><div class="gen-spinner"></div><div class="gen-overlay-text">Generating presentation...</div><div class="gen-overlay-count" id="gen-overlay-count"></div></div>';
+                overlay.innerHTML = '<div class="gen-overlay-content"><div class="gen-spinner" id="gen-overlay-spinner"></div><div class="gen-overlay-status"><div class="gen-overlay-text" id="gen-overlay-text">Generating presentation...</div><div class="gen-overlay-count" id="gen-overlay-count"></div></div></div>';
                 document.body.appendChild(overlay);
             }
+            const spinner = document.getElementById('gen-overlay-spinner');
+            if (spinner) spinner.style.display = '';
+            const text = document.getElementById('gen-overlay-text');
+            if (text) text.textContent = 'Generating presentation...';
+            const count = document.getElementById('gen-overlay-count');
+            if (count) count.textContent = '';
+            overlay.className = 'gen-active';
             overlay.style.display = '';
         } else {
             if (overlay) overlay.style.display = 'none';
@@ -499,7 +506,57 @@ p { font-size: 24px; color: #a0a0b0; }
 
     function updateGenerationOverlay(slideCount) {
         const countEl = document.getElementById('gen-overlay-count');
+        const textEl = document.getElementById('gen-overlay-text');
         if (countEl) countEl.textContent = `Slide ${slideCount} completed`;
+        if (textEl) textEl.textContent = 'Generating...';
+    }
+
+    function showGenerationComplete(totalSlides) {
+        let overlay = document.getElementById('generation-overlay');
+        if (!overlay) return;
+
+        const spinner = document.getElementById('gen-overlay-spinner');
+        const text = document.getElementById('gen-overlay-text');
+        const count = document.getElementById('gen-overlay-count');
+
+        if (spinner) spinner.style.display = 'none';
+        if (text) text.innerHTML = '&#10003; Complete!';
+        if (count) count.textContent = `${totalSlides} slide(s) generated`;
+
+        overlay.className = 'gen-complete';
+
+        setTimeout(() => {
+            if (overlay && overlay.parentNode) {
+                overlay.style.animation = 'gen-fadeout 0.5s ease forwards';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    overlay.style.animation = '';
+                    overlay.className = 'gen-active';
+                }, 500);
+            }
+        }, 3000);
+    }
+
+    function showGenerationError(message) {
+        let overlay = document.getElementById('generation-overlay');
+        if (!overlay) return;
+
+        const spinner = document.getElementById('gen-overlay-spinner');
+        const text = document.getElementById('gen-overlay-text');
+        const count = document.getElementById('gen-overlay-count');
+
+        if (spinner) spinner.style.display = 'none';
+        if (text) text.innerHTML = '&#10007; Error';
+        if (count) count.textContent = message;
+
+        overlay.className = 'gen-error';
+
+        setTimeout(() => {
+            if (overlay) {
+                overlay.style.display = 'none';
+                overlay.className = 'gen-active';
+            }
+        }, 5000);
     }
 
     async function fetchOllamaModels() {
@@ -888,19 +945,23 @@ RULES:
                     state.currentSlideIndex = 0;
                     saveSlides();
                     renderAll();
-                    streamMsg.textContent = `Done. ${finalCount} slide(s) generated. Switch to Edit mode to make changes.`;
+                    streamMsg.textContent = `Done. ${finalCount} slide(s) generated.`;
+                    showGenerationComplete(finalCount);
                 } else {
                     streamMsg.textContent = 'Could not parse slides from the response. Try rephrasing or using a different generation mode.';
+                    showGenerationError('No slides parsed');
                 }
             } else {
                 streamMsg.textContent = allParsedSlides.length > 0
                     ? `Stopped after ${allParsedSlides.length} slide(s).`
                     : 'Generation cancelled.';
+                showGenerationComplete(allParsedSlides.length);
             }
         } catch (e) {
             state.onStreamToken = null;
             if (e.name !== 'AbortError') {
                 streamMsg.textContent = `Error: ${e.message}`;
+                showGenerationError(e.message);
             }
         } finally {
             state.isGenerating = false;
@@ -909,7 +970,6 @@ RULES:
             stopBtn.style.display = 'none';
             state.abortController = null;
             state.onStreamToken = null;
-            showGenerationOverlay(false);
         }
     }
 
@@ -938,6 +998,12 @@ RULES:
         streamMsg.innerHTML = '<span class="loading-dots">Editing slide</span>';
         document.getElementById('chat-messages').appendChild(streamMsg);
 
+        showGenerationOverlay(true);
+        const textEl = document.getElementById('gen-overlay-text');
+        if (textEl) textEl.textContent = 'Editing slide...';
+        const countEl = document.getElementById('gen-overlay-count');
+        if (countEl) countEl.textContent = `Slide ${state.currentSlideIndex + 1} of ${state.slides.length}`;
+
         let editSlideReceived = false;
 
         state.onStreamToken = (fullContent) => {
@@ -948,6 +1014,8 @@ RULES:
                 saveSlides();
                 renderAll();
                 streamMsg.textContent = 'Applying changes...';
+                const ct = document.getElementById('gen-overlay-count');
+                if (ct) ct.textContent = 'Updating preview...';
             }
             document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
         };
@@ -966,17 +1034,21 @@ RULES:
                     state.slides[state.currentSlideIndex] = parsedSlides[parsedSlides.length - 1];
                     saveSlides();
                     renderAll();
-                    streamMsg.textContent = 'Slide updated successfully.';
+                    streamMsg.textContent = 'Slide updated.';
+                    showGenerationComplete(1);
                 } else if (editSlideReceived) {
-                    streamMsg.textContent = 'Slide updated successfully.';
+                    streamMsg.textContent = 'Slide updated.';
+                    showGenerationComplete(1);
                 } else {
                     streamMsg.textContent = 'Could not parse the edited slide. Try being more specific.';
+                    showGenerationError('No slide parsed');
                 }
             }
         } catch (e) {
             state.onStreamToken = null;
             if (e.name !== 'AbortError') {
                 streamMsg.textContent = `Error: ${e.message}`;
+                showGenerationError(e.message);
             }
         } finally {
             state.isGenerating = false;
@@ -985,6 +1057,7 @@ RULES:
             stopBtn.style.display = 'none';
             state.abortController = null;
             state.onStreamToken = null;
+            showGenerationOverlay(false);
         }
     }
 

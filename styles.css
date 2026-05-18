@@ -1151,16 +1151,35 @@ body {
     position: fixed;
     bottom: 40px;
     right: 40px;
-    background: rgba(26, 26, 46, 0.95);
+    background: rgba(26, 26, 46, 0.97);
     border: 1px solid var(--accent);
     border-radius: 16px;
-    padding: 24px 36px;
+    padding: 20px 32px;
     z-index: 500;
     display: flex;
     align-items: center;
     gap: 16px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(79,195,247,0.15);
+    transition: all 0.3s ease;
+}
+
+#generation-overlay.gen-active {
+    border-color: var(--accent);
     animation: gen-pulse 2s ease-in-out infinite;
+}
+
+#generation-overlay.gen-complete {
+    border-color: #66bb6a;
+    background: rgba(26, 46, 26, 0.97);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(102,187,106,0.3);
+    animation: none;
+}
+
+#generation-overlay.gen-error {
+    border-color: var(--danger);
+    background: rgba(46, 26, 26, 0.97);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(239,83,80,0.3);
+    animation: none;
 }
 
 .gen-overlay-content {
@@ -1169,9 +1188,15 @@ body {
     gap: 16px;
 }
 
+.gen-overlay-status {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .gen-spinner {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border: 3px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
@@ -1180,9 +1205,18 @@ body {
 }
 
 .gen-overlay-text {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--accent);
+}
+
+.gen-complete .gen-overlay-text {
+    color: #66bb6a;
+    font-size: 16px;
+}
+
+.gen-error .gen-overlay-text {
+    color: var(--danger);
 }
 
 .gen-overlay-count {
@@ -1196,5 +1230,10 @@ body {
 
 @keyframes gen-pulse {
     0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(79,195,247,0.15); }
-    50% { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 40px rgba(79,195,247,0.3); }
+    50% { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 40px rgba(79,195,247,0.35); }
+}
+
+@keyframes gen-fadeout {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(10px); }
 }
