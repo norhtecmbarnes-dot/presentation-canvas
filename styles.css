@@ -229,7 +229,7 @@ body {
     align-self: flex-start;
 }
 
-#generation-mode {
+#mode-bar {
     padding: 8px 12px;
     border-top: 1px solid var(--border);
     display: flex;
@@ -238,9 +238,36 @@ body {
     font-size: 12px;
 }
 
-#generation-mode label {
+#mode-bar label {
     color: var(--text-secondary);
     white-space: nowrap;
+}
+
+.mode-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 5px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: var(--bg-primary);
+    border-color: var(--accent);
+}
+
+.mode-btn:hover {
+    border-color: var(--accent);
+}
+
+.mode-btn-edit.active {
+    background: #ff9800;
+    border-color: #ff9800;
 }
 
 #gen-mode-select {
@@ -257,7 +284,12 @@ body {
     padding: 10px;
     border-top: 1px solid var(--border);
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#chat-btn-row {
+    display: flex;
     gap: 6px;
 }
 
@@ -811,4 +843,151 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
+}
+
+/* ===== MODE BAR ===== */
+#mode-bar {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+#mode-bar label {
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.mode-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 5px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.mode-btn.active {
+    background: var(--accent);
+    color: var(--bg-primary);
+    border-color: var(--accent);
+}
+
+.mode-btn:hover {
+    border-color: var(--accent);
+}
+
+.mode-btn-edit.active {
+    background: #ff9800;
+    border-color: #ff9800;
+}
+
+#gen-mode-select {
+    flex: 1;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+#chat-btn-row {
+    display: flex;
+    gap: 6px;
+}
+
+#chat-regenerate-btn {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+#chat-regenerate-btn:hover {
+    background: var(--accent);
+    color: var(--bg-primary);
+}
+
+#apply-html-btn {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#apply-html-btn:hover {
+    background: #4caf50;
+}
+
+/* ===== TEMPLATE BUTTONS ===== */
+#templates-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.template-btn {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+    transition: all 0.2s;
+}
+
+.template-btn:hover {
+    background: var(--accent);
+    color: var(--bg-primary);
+    border-color: var(--accent);
+}
+
+/* ===== IMPORT MODAL ===== */
+#import-source-select,
+#import-clipboard-text {
+    width: 100%;
+}
+
+#import-file-name {
+    font-size: 12px;
+}
+
+.modal-content h3 {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    color: var(--accent);
+    font-size: 14px;
+}
+
+.modal-content label[for="import-file"] {
+    cursor: pointer;
+    display: inline-block;
+    padding: 10px 20px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.modal-content label[for="import-file"]:hover {
+    background: var(--accent);
+    color: var(--bg-primary);
+    border-color: var(--accent);
 }

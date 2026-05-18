@@ -4,36 +4,110 @@
     const DEFAULT_SLIDE_HTML = `<!DOCTYPE html>
 <html><head><style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', sans-serif; background: #ffffff; color: #222; }
+body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; }
 .container { text-align: center; padding: 40px; }
-h1 { font-size: 48px; margin-bottom: 16px; color: #333; }
-p { font-size: 24px; color: #666; }
+h1 { font-size: 48px; margin-bottom: 16px; color: #ffffff; }
+p { font-size: 24px; color: #a0a0b0; }
 </style></head><body>
-<div class="container"><h1>New Slide</h1><p>Start describing your presentation in the chat panel.</p></div>
+<div class="container"><h1>Canvas</h1><p>Describe your presentation in the chat panel to get started.</p></div>
 </body></html>`;
 
     const SLIDE_THEMES = {
-        dark: {
-            background: '#1a1a2e', color: '#e0e0e0', accent: '#4fc3f7',
-            h1Color: '#ffffff', h2Color: '#4fc3f7', linkColor: '#81d4fa'
+        dark: { background: '#1a1a2e', color: '#e0e0e0', accent: '#4fc3f7', h1Color: '#ffffff', h2Color: '#4fc3f7', linkColor: '#81d4fa' },
+        light: { background: '#ffffff', color: '#222222', accent: '#1976d2', h1Color: '#111111', h2Color: '#1976d2', linkColor: '#1565c0' },
+        blue: { background: '#0d47a1', color: '#e3f2fd', accent: '#ffca28', h1Color: '#ffffff', h2Color: '#ffca28', linkColor: '#81d4fa' },
+        green: { background: '#1b5e20', color: '#e8f5e9', accent: '#ffca28', h1Color: '#ffffff', h2Color: '#a5d6a7', linkColor: '#c8e6c9' },
+        red: { background: '#b71c1c', color: '#ffebee', accent: '#ffcdd2', h1Color: '#ffffff', h2Color: '#ffcdd2', linkColor: '#ef9a9a' }
+    };
+
+    const BUILT_IN_TEMPLATES = {
+        'blank-presentation': {
+            name: 'Blank Presentation',
+            description: 'A clean starting point with a title slide',
+            theme: 'dark',
+            slides: [DEFAULT_SLIDE_HTML]
         },
-        light: {
-            background: '#ffffff', color: '#222222', accent: '#1976d2',
-            h1Color: '#111111', h2Color: '#1976d2', linkColor: '#1565c0'
+        'business-pitch': {
+            name: 'Business Pitch',
+            description: '5-slide pitch deck for startups and business ideas',
+            theme: 'dark',
+            slides: [
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;}.container{text-align:center;padding:60px;}h1{font-size:52px;margin-bottom:12px;color:#fff;font-weight:700;}p{font-size:22px;color:#4fc3f7;margin-bottom:8px;}.tagline{font-size:18px;color:#a0a0b0;margin-top:16px;}</style></head><body><div class="container"><p>PRESENTING</p><h1>[Company Name]</h1><div class="tagline">Your tagline goes here</div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;padding:60px;}.title{font-size:36px;margin-bottom:30px;color:#4fc3f7;border-bottom:3px solid #4fc3f7;padding-bottom:10px;display:inline-block;}.problem{font-size:20px;line-height:1.8;margin-bottom:20px;}.stat{display:inline-block;background:rgba(79,195,247,0.15);padding:15px 25px;border-radius:8px;margin:5px;text-align:center;}.stat-num{font-size:32px;font-weight:700;color:#4fc3f7;}.stat-label{font-size:14px;color:#a0a0b0;}</style></head><body><div class="title">The Problem</div><div class="problem">Describe the problem your company solves. Make it relatable and urgent.</div><div><div class="stat"><div class="stat-num">80%</div><div class="stat-label">of companies face this</div></div><div class="stat"><div class="stat-num">$2T</div><div class="stat-label">market size</div></div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;padding:60px;}.title{font-size:36px;margin-bottom:30px;color:#4fc3f7;border-bottom:3px solid #4fc3f7;padding-bottom:10px;display:inline-block;}.features{display:flex;gap:30px;margin-top:20px;}.feature{flex:1;background:rgba(79,195,247,0.1);padding:30px;border-radius:12px;border:1px solid rgba(79,195,247,0.2);}.feature h3{color:#4fc3f7;margin-bottom:12px;font-size:20px;}.feature p{font-size:16px;line-height:1.6;color:#a0a0b0;}</style></head><body><div class="title">Our Solution</div><div class="features"><div class="feature"><h3>Feature One</h3><p>Describe your first key feature and its benefit to users.</p></div><div class="feature"><h3>Feature Two</h3><p>Describe your second key feature and how it differentiates you.</p></div><div class="feature"><h3>Feature Three</h3><p>Describe your third key feature and the value it delivers.</p></div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;padding:60px;}.title{font-size:36px;margin-bottom:30px;color:#4fc3f7;border-bottom:3px solid #4fc3f7;padding-bottom:10px;display:inline-block;}.row{display:flex;gap:40px;}.col{flex:1;}.col h3{color:#4fc3f7;margin-bottom:15px;font-size:22px;}.col ul{list-style:none;padding:0;}.col li{font-size:18px;line-height:2;color:#a0a0b0;padding-left:20px;position:relative;}.col li::before{content:'→';position:absolute;left:0;color:#4fc3f7;}</style></head><body><div class="title">Business Model</div><div class="row"><div class="col"><h3>Revenue Streams</h3><ul><li>Subscription tiers</li><li>Enterprise contracts</li><li>Marketplace commissions</li></ul></div><div class="col"><h3>Key Metrics</h3><ul><li>MRR growth rate</li><li>Customer acquisition cost</li><li>Lifetime value</li></ul></div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:#e0e0e0;text-align:center;}.container{padding:60px;}h1{font-size:48px;color:#fff;margin-bottom:16px;}.cta{font-size:24px;color:#4fc3f7;margin-bottom:30px;}.contact{font-size:18px;color:#a0a0b0;}.contact a{color:#4fc3f7;text-decoration:none;}</style></head><body><div class="container"><h1>Let's Build Together</h1><div class="cta">Ready to transform your business?</div><div class="contact">hello@company.com | company.com</div></div></body></html>`
+            ]
         },
-        blue: {
-            background: '#0d47a1', color: '#e3f2fd', accent: '#ffca28',
-            h1Color: '#ffffff', h2Color: '#ffca28', linkColor: '#81d4fa'
+        'tech-overview': {
+            name: 'Tech Overview',
+            description: 'Technical presentation template with code-style layout',
+            theme: 'dark',
+            slides: [
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:#0d1117;color:#c9d1d9;}.container{text-align:center;padding:60px;}.badge{display:inline-block;background:#238636;color:#fff;padding:4px 16px;border-radius:20px;font-size:14px;margin-bottom:20px;}h1{font-size:52px;margin-bottom:12px;color:#f0f6fc;font-weight:700;}p{font-size:20px;color:#8b949e;}</style></head><body><div class="container"><div class="badge">OPEN SOURCE</div><h1>Technology Overview</h1><p>A deep dive into our architecture & tech stack</p></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#0d1117;color:#c9d1d9;padding:60px;}.title{font-size:32px;margin-bottom:30px;color:#58a6ff;border-bottom:2px solid #21262d;padding-bottom:12px;display:inline-block;}.arch{display:flex;flex-direction:column;gap:16px;margin-top:20px;}.layer{display:flex;align-items:center;gap:20px;background:#161b22;padding:20px 24px;border-radius:8px;border:1px solid #21262d;}.layer-label{width:120px;font-weight:700;color:#58a6ff;font-size:16px;}.layer-items{display:flex;gap:10px;flex-wrap:wrap;}.layer-item{background:#21262d;padding:6px 14px;border-radius:6px;font-size:14px;border:1px solid #30363d;}</style></head><body><div class="title">System Architecture</div><div class="arch"><div class="layer"><div class="layer-label">Frontend</div><div class="layer-items"><div class="layer-item">React</div><div class="layer-item">TypeScript</div><div class="layer-item">Next.js</div></div></div><div class="layer"><div class="layer-label">API Gateway</div><div class="layer-items"><div class="layer-item">GraphQL</div><div class="layer-item">REST</div><div class="layer-item">WebSocket</div></div></div><div class="layer"><div class="layer-label">Services</div><div class="layer-items"><div class="layer-item">Auth Service</div><div class="layer-item">Data Pipeline</div><div class="layer-item">ML Engine</div></div></div><div class="layer"><div class="layer-label">Data</div><div class="layer-items"><div class="layer-item">PostgreSQL</div><div class="layer-item">Redis</div><div class="layer-item">S3</div></div></div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#0d1117;color:#c9d1d9;padding:60px;}.title{font-size:32px;margin-bottom:30px;color:#58a6ff;border-bottom:2px solid #21262d;padding-bottom:12px;display:inline-block;}.code-block{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:20px;font-family:'Consolas',monospace;font-size:14px;line-height:1.7;overflow-x:auto;margin-top:20px;}.keyword{color:#ff7b72;}.string{color:#a5d6ff;}.comment{color:#8b949e;}.func{color:#d2a8ff;}</style></head><body><div class="title">Code Example</div><div class="code-block"><span class="comment">// Initialize the service</span><br><span class="keyword">const</span> service = <span class="keyword">new</span> <span class="func">DataService</span>({<br>&nbsp;&nbsp;endpoint: <span class="string">'https://api.example.com'</span>,<br>&nbsp;&nbsp;retries: <span class="keyword">3</span>,<br>&nbsp;&nbsp;timeout: <span class="keyword">5000</span>,<br>});<br><br><span class="keyword">const</span> result = <span class="keyword">await</span> service.<span class="func">process</span>(data);<br>console.<span class="func">log</span>(result);</div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:#0d1117;color:#c9d1d9;text-align:center;}.container{padding:60px;}.badge{display:inline-block;background:#1f6feb;color:#fff;padding:4px 16px;border-radius:20px;font-size:14px;margin-bottom:20px;}h1{font-size:42px;color:#f0f6fc;margin-bottom:12px;}.next-steps{display:flex;gap:20px;justify-content:center;margin-top:30px;}.next-step{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:20px 28px;text-align:left;}.next-step h3{color:#58a6ff;font-size:18px;margin-bottom:6px;}.next-step p{color:#8b949e;font-size:14px;}</style></head><body><div class="container"><div class="badge">NEXT STEPS</div><h1>Where We Go From Here</h1><div class="next-steps"><div class="next-step"><h3>Deploy</h3><p>Ship to production</p></div><div class="next-step"><h3>Monitor</h3><p>Track performance</p></div><div class="next-step"><h3>Iterate</h3><p>Improve & scale</p></div></div></div></body></html>`
+            ]
         },
-        green: {
-            background: '#1b5e20', color: '#e8f5e9', accent: '#ffca28',
-            h1Color: '#ffffff', h2Color: '#a5d6a7', linkColor: '#c8e6c9'
+        'education': {
+            name: 'Education',
+            description: 'Lecture and educational presentation template',
+            theme: 'light',
+            slides: [
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1565c0 0%,#1976d2 100%);color:#fff;}.container{text-align:center;padding:60px;}.subject{font-size:18px;text-transform:uppercase;letter-spacing:3px;opacity:0.8;margin-bottom:10px;}h1{font-size:52px;margin-bottom:12px;font-weight:700;}.subtitle{font-size:20px;opacity:0.9;}.meta{margin-top:30px;font-size:16px;opacity:0.7;}</style></head><body><div class="container"><div class="subject">Course Title</div><h1>Lesson Name</h1><div class="subtitle">A comprehensive overview</div><div class="meta">Instructor Name | Date</div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#f5f5f5;color:#222;padding:60px;}.title{font-size:36px;margin-bottom:30px;color:#1565c0;border-bottom:3px solid #1565c0;padding-bottom:10px;display:inline-block;}.objectives{list-style:none;padding:0;}.objectives li{font-size:20px;line-height:2.2;padding-left:30px;position:relative;}.objectives li::before{content:'✓';position:absolute;left:0;color:#1565c0;font-weight:bold;}</style></head><body><div class="title">Learning Objectives</div><ul class="objectives"><li>Understand the core concepts</li><li>Apply knowledge to real problems</li><li>Analyze and evaluate outcomes</li><li>Create original solutions</li></ul></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#f5f5f5;color:#222;padding:60px;}.title{font-size:36px;margin-bottom:30px;color:#1565c0;border-bottom:3px solid #1565c0;padding-bottom:10px;display:inline-block;}.two-col{display:flex;gap:40px;}.col{flex:1;background:#fff;padding:30px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);}.col h3{color:#1565c0;margin-bottom:15px;font-size:22px;}.col p{font-size:18px;line-height:1.8;color:#555;}</style></head><body><div class="title">Key Concepts</div><div class="two-col"><div class="col"><h3>Concept A</h3><p>Explanation of the first key concept with examples and connections to prior knowledge.</p></div><div class="col"><h3>Concept B</h3><p>Explanation of the second key concept with examples and connections to prior knowledge.</p></div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#1565c0 0%,#1976d2 100%);color:#fff;text-align:center;}.container{padding:60px;}h1{font-size:48px;margin-bottom:12px;}.subtitle{font-size:22px;opacity:0.9;margin-bottom:30px;}.review-points{display:flex;gap:20px;justify-content:center;margin-top:20px;}.point{background:rgba(255,255,255,0.15);padding:20px;border-radius:8px;min-width:140px;}.point h3{font-size:18px;margin-bottom:4px;}.point p{font-size:14px;opacity:0.8;}</style></head><body><div class="container"><h1>Summary & Review</h1><div class="subtitle">What we covered today</div><div class="review-points"><div class="point"><h3>Concept 1</h3><p>Key takeaway</p></div><div class="point"><h3>Concept 2</h3><p>Key takeaway</p></div><div class="point"><h3>Concept 3</h3><p>Key takeaway</p></div></div></div></body></html>`
+            ]
         },
-        red: {
-            background: '#b71c1c', color: '#ffebee', accent: '#ffcdd2',
-            h1Color: '#ffffff', h2Color: '#ffcdd2', linkColor: '#ef9a9a'
+        'photo-gallery': {
+            name: 'Photo Gallery',
+            description: 'Image-focused presentation template',
+            theme: 'dark',
+            slides: [
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:#111;color:#fff;text-align:center;}.container{padding:60px;}h1{font-size:56px;font-weight:300;letter-spacing:4px;margin-bottom:12px;}.line{width:60px;height:3px;background:#4fc3f7;margin:0 auto 16px;}.subtitle{font-size:20px;color:#888;font-weight:300;}</style></head><body><div class="container"><h1>GALLERY</h1><div class="line"></div><div class="subtitle">A visual journey</div></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#111;color:#fff;padding:40px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:12px;}.photo{background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#666;min-height:200px;position:relative;overflow:hidden;}.photo:nth-child(1){grid-row:1/3;}</style></head><body><div class="photo">Upload image here</div><div class="photo">Upload image here</div><div class="photo">Upload image here</div><div class="photo">Upload image here</div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:#111;color:#fff;}.left{width:50%;display:flex;align-items:center;justify-content:center;background:#222;font-size:18px;color:#666;}.right{width:50%;padding:60px;display:flex;flex-direction:column;justify-content:center;}.right h2{font-size:36px;font-weight:300;margin-bottom:20px;letter-spacing:1px;}.right p{font-size:20px;line-height:1.8;color:#aaa;}</style></head><body><div class="left">Upload image here</div><div class="right"><h2>Story Behind</h2><p>Add your description here. Tell the story behind the image and what makes it meaningful.</p></div></body></html>`,
+                `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:#111;color:#fff;text-align:center;}.container{padding:60px;}h1{font-size:48px;font-weight:300;letter-spacing:3px;margin-bottom:12px;}.line{width:60px;height:3px;background:#4fc3f7;margin:0 auto 16px;}.subtitle{font-size:18px;color:#888;}</style></head><body><div class="container"><h1>THANK YOU</h1><div class="line"></div><div class="subtitle">contact@example.com</div></div></body></html>`
+            ]
         }
     };
+
+    async function loadExternalTemplates() {
+        try {
+            const response = await fetch('templates.json');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.templates) {
+                    Object.keys(data.templates).forEach(key => {
+                        if (!BUILT_IN_TEMPLATES[key]) {
+                            BUILT_IN_TEMPLATES[key] = data.templates[key];
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.log('External templates not loaded:', e);
+        }
+        renderTemplateButtons();
+    }
+
+    function renderTemplateButtons() {
+        const container = document.getElementById('templates-list');
+        if (!container) return;
+        container.innerHTML = '';
+        Object.keys(BUILT_IN_TEMPLATES).forEach(key => {
+            const tpl = BUILT_IN_TEMPLATES[key];
+            const btn = document.createElement('button');
+            btn.className = 'template-btn';
+            btn.dataset.template = key;
+            btn.textContent = tpl.name || key;
+            btn.title = tpl.description || '';
+            btn.addEventListener('click', () => loadTemplate(key));
+            container.appendChild(btn);
+        });
+    }
 
     let state = {
         slides: [],
@@ -42,6 +116,7 @@ p { font-size: 24px; color: #666; }
         chatHistory: [],
         isGenerating: false,
         abortController: null,
+        currentMode: 'generate',
         settings: {
             ollamaUrl: 'http://localhost:11434',
             openaiKey: '',
@@ -63,7 +138,7 @@ p { font-size: 24px; color: #666; }
         try {
             const saved = localStorage.getItem('canvas_settings');
             if (saved) Object.assign(state.settings, JSON.parse(saved));
-        } catch (e) { /* ignore */ }
+        } catch (e) { }
     }
 
     function saveSettings() {
@@ -77,7 +152,7 @@ p { font-size: 24px; color: #666; }
                 state.slides = JSON.parse(saved);
                 if (state.slides.length > 0) return true;
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) { }
         return false;
     }
 
@@ -124,7 +199,6 @@ p { font-size: 24px; color: #666; }
 
     function renderSlidePreview() {
         const previewArea = document.getElementById('slide-preview-area');
-        const htmlArea = document.getElementById('slide-html-area');
         const htmlEditor = document.getElementById('slide-html-editor');
 
         if (state.slides.length === 0) {
@@ -143,7 +217,6 @@ p { font-size: 24px; color: #666; }
             previewArea.appendChild(existingIframe);
         }
         existingIframe.srcdoc = slideHtml;
-
         htmlEditor.value = slideHtml;
     }
 
@@ -154,7 +227,6 @@ p { font-size: 24px; color: #666; }
             const thumb = document.createElement('div');
             thumb.className = 'slide-thumb' + (i === state.currentSlideIndex ? ' active' : '');
             thumb.innerHTML = `<span class="slide-thumb-number">${i + 1}</span>`;
-
             const iframe = document.createElement('iframe');
             iframe.sandbox = 'allow-scripts allow-same-origin';
             iframe.srcdoc = slide;
@@ -221,10 +293,26 @@ p { font-size: 24px; color: #666; }
     }
 
     function updateSlideProps() {
-        const layoutSelect = document.getElementById('layout-select');
-        const themeSelect = document.getElementById('theme-select');
-        const transitionSelect = document.getElementById('transition-select');
-        themeSelect.value = state.currentTheme;
+        document.getElementById('theme-select').value = state.currentTheme;
+    }
+
+    function setMode(mode) {
+        state.currentMode = mode;
+        const genBtn = document.getElementById('mode-generate-btn');
+        const editBtn = document.getElementById('mode-edit-btn');
+        const chatInput = document.getElementById('chat-input');
+        const genModeSelect = document.getElementById('gen-mode-select');
+
+        genBtn.classList.toggle('active', mode === 'generate');
+        editBtn.classList.toggle('active', mode === 'edit');
+
+        if (mode === 'generate') {
+            chatInput.placeholder = 'Describe your presentation... e.g. "Create a 5-slide presentation about renewable energy"';
+            genModeSelect.style.display = '';
+        } else {
+            chatInput.placeholder = 'Describe changes for the current slide... e.g. "Change the title to Introduction" or "Add a bullet list"';
+            genModeSelect.style.display = 'none';
+        }
     }
 
     function addChatMessage(role, content) {
@@ -290,7 +378,7 @@ p { font-size: 24px; color: #666; }
         } else if (provider === 'openai') {
             models = await fetchOpenAIModels();
         } else if (provider === 'zhipu') {
-            models = [state.settings.zhipuModel, 'glm-4', 'glm-4-flash', 'glm-4-plus', 'glm-4v'];
+            models = ['glm-4', 'glm-4-flash', 'glm-4-plus', 'glm-4v', state.settings.zhipuModel].filter((v, i, a) => a.indexOf(v) === i);
         } else if (provider === 'custom') {
             models = [state.settings.customModel].filter(Boolean);
         }
@@ -323,15 +411,10 @@ p { font-size: 24px; color: #666; }
         state.abortController = new AbortController();
 
         try {
-            if (provider === 'ollama') {
-                return await sendToOllama(prompt, systemPrompt, model);
-            } else if (provider === 'openai') {
-                return await sendToOpenAI(prompt, systemPrompt, model);
-            } else if (provider === 'zhipu') {
-                return await sendToZhipu(prompt, systemPrompt, model);
-            } else if (provider === 'custom') {
-                return await sendToCustom(prompt, systemPrompt, model);
-            }
+            if (provider === 'ollama') return await sendToOllama(prompt, systemPrompt, model);
+            else if (provider === 'openai') return await sendToOpenAI(prompt, systemPrompt, model);
+            else if (provider === 'zhipu') return await sendToZhipu(prompt, systemPrompt, model);
+            else if (provider === 'custom') return await sendToCustom(prompt, systemPrompt, model);
         } catch (e) {
             if (e.name === 'AbortError') {
                 addSystemMessage('Generation stopped.');
@@ -341,10 +424,9 @@ p { font-size: 24px; color: #666; }
         }
     }
 
-    async function sendToOllama(prompt, systemPrompt, model) {
+    function buildMessages(systemPrompt, prompt) {
         const messages = [];
         if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
         const recentHistory = state.chatHistory.slice(-10);
         recentHistory.forEach(msg => {
             if (msg.role === 'user' || msg.role === 'assistant') {
@@ -352,139 +434,51 @@ p { font-size: 24px; color: #666; }
             }
         });
         messages.push({ role: 'user', content: prompt });
+        return messages;
+    }
 
+    async function sendToOllama(prompt, systemPrompt, model) {
         const response = await fetch(`${state.settings.ollamaUrl}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, messages, stream: false }),
+            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
             signal: state.abortController.signal
         });
-
         const data = await response.json();
         return data.message?.content || '';
     }
 
-    async function sendToOllamaStream(prompt, systemPrompt, model) {
-        const messages = [];
-        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
-        const recentHistory = state.chatHistory.slice(-10);
-        recentHistory.forEach(msg => {
-            if (msg.role === 'user' || msg.role === 'assistant') {
-                messages.push({ role: msg.role, content: msg.content });
-            }
-        });
-        messages.push({ role: 'user', content: prompt });
-
-        const response = await fetch(`${state.settings.ollamaUrl}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, messages, stream: true }),
-            signal: state.abortController.signal
-        });
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullContent = '';
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-
-            for (const line of lines) {
-                try {
-                    const json = JSON.parse(line);
-                    if (json.message?.content) {
-                        fullContent += json.message.content;
-                    }
-                } catch (e) { /* skip non-JSON lines */ }
-            }
-        }
-
-        return fullContent;
-    }
-
     async function sendToOpenAI(prompt, systemPrompt, model) {
-        const messages = [];
-        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
-        const recentHistory = state.chatHistory.slice(-10);
-        recentHistory.forEach(msg => {
-            if (msg.role === 'user' || msg.role === 'assistant') {
-                messages.push({ role: msg.role, content: msg.content });
-            }
-        });
-        messages.push({ role: 'user', content: prompt });
-
         const response = await fetch(`${state.settings.openaiUrl}/chat/completions`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${state.settings.openaiKey}`
-            },
-            body: JSON.stringify({ model, messages, stream: false }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.settings.openaiKey}` },
+            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
             signal: state.abortController.signal
         });
-
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
     }
 
     async function sendToZhipu(prompt, systemPrompt, model) {
-        const messages = [];
-        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
-        const recentHistory = state.chatHistory.slice(-10);
-        recentHistory.forEach(msg => {
-            if (msg.role === 'user' || msg.role === 'assistant') {
-                messages.push({ role: msg.role, content: msg.content });
-            }
-        });
-        messages.push({ role: 'user', content: prompt });
-
         const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${state.settings.zhipuKey}`
-            },
-            body: JSON.stringify({ model, messages, stream: false }),
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.settings.zhipuKey}` },
+            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
             signal: state.abortController.signal
         });
-
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
     }
 
     async function sendToCustom(prompt, systemPrompt, model) {
-        const messages = [];
-        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-
-        const recentHistory = state.chatHistory.slice(-10);
-        recentHistory.forEach(msg => {
-            if (msg.role === 'user' || msg.role === 'assistant') {
-                messages.push({ role: msg.role, content: msg.content });
-            }
-        });
-        messages.push({ role: 'user', content: prompt });
-
         const headers = { 'Content-Type': 'application/json' };
-        if (state.settings.customKey) {
-            headers['Authorization'] = `Bearer ${state.settings.customKey}`;
-        }
-
+        if (state.settings.customKey) headers['Authorization'] = `Bearer ${state.settings.customKey}`;
         const response = await fetch(`${state.settings.customUrl}/chat/completions`, {
             method: 'POST',
             headers,
-            body: JSON.stringify({ model, messages, stream: false }),
+            body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: false }),
             signal: state.abortController.signal
         });
-
         const data = await response.json();
         return data.choices?.[0]?.message?.content || '';
     }
@@ -495,13 +489,12 @@ p { font-size: 24px; color: #666; }
         state.uploadedImages.forEach((img, i) => {
             context += `- Image ${i + 1}: "${img.name}" (${img.width}x${img.height})\n`;
         });
-        context += '\nTo embed an uploaded image in a slide, use an <img> tag with the src starting with "data:image/..." and include the full base64 data. You can reference the image data directly.';
+        context += '\nTo embed an uploaded image in a slide, use an <img> tag with the src starting with "data:image/..." and include the full base64 data.';
         return context;
     }
 
     function getSlideSystemPrompt(mode) {
         const theme = SLIDE_THEMES[state.currentTheme];
-
         const basePrompt = `You are an expert presentation creator. You create beautiful, professional HTML slides.
 
 CRITICAL RULES:
@@ -516,32 +509,28 @@ CRITICAL RULES:
 
         if (mode === 'script') {
             return basePrompt + `\n\nYou are in SCRIPT mode. The user will describe a topic, and you must:
-1. First, plan the presentation by outlining slide titles and key points.
+1. Plan the presentation by outlining slide titles and key points.
 2. Then generate each slide as a complete HTML document.
-3. Output each slide wrapped in special markers: <<<SLIDE>>> at the start and <<<END_SLIDE>>> at the end of each slide HTML.
+3. Output each slide wrapped in <<<SLIDE>>> at the start and <<<END_SLIDE>>> at the end.
 4. You may include brief commentary between slides explaining your design choices.`;
         } else if (mode === 'markdown') {
-            return basePrompt + `\n\nYou are in MARKDOWN mode. Generate slide content using markdown-like syntax with special slide separators:
+            return basePrompt + `\n\nYou are in MARKDOWN mode. Generate slide content using markdown with ---SLIDE--- separators:
 
 ---SLIDE---
 # Title
 Content here
 ---SLIDE---
-## Next Slide
-More content
----SLIDE---
 
-After generating the markdown, also generate the complete HTML for each slide, wrapped in <<<SLIDE>>> and <<<END_SLIDE>>> markers.`;
+Then also generate the complete HTML for each slide wrapped in <<<SLIDE>>> and <<<END_SLIDE>>> markers.`;
         } else {
             return basePrompt + `\n\nYou are in SLIDES mode. Generate complete slide HTML documents directly.
-Output each slide wrapped in <<<SLIDE>>> at the start and <<<END_SLIDE>>> at the end.
-Generate beautiful, complete slides with all styling included.`;
+Output each slide wrapped in <<<SLIDE>>> at the start and <<<END_SLIDE>>> at the end.`;
         }
     }
 
     function getEditSystemPrompt() {
         const theme = SLIDE_THEMES[state.currentTheme];
-        return `You are an expert slide editor. The user wants to modify an existing slide. 
+        return `You are an expert slide editor. The user wants to modify an existing slide.
 
 RULES:
 - Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head>, <style>, and <body> tags.
@@ -576,11 +565,35 @@ RULES:
             const bodyRegex = /<body[^>]*>([\s\S]*?)<\/body>/gi;
             while ((match = bodyRegex.exec(response)) !== null) {
                 const bodyContent = match[1];
-                slides.push(`<!DOCTYPE html><html><head><style>body{margin:0;padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${SLIDE_THEMES[state.currentTheme].background};color:${SLIDE_THEMES[state.currentTheme].color};}</style></head><body>${bodyContent}</body></html>`);
+                const t = SLIDE_THEMES[state.currentTheme];
+                slides.push(`<!DOCTYPE html><html><head><style>body{margin:0;padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${t.background};color:${t.color};}</style></head><body>${bodyContent}</body></html>`);
             }
         }
 
         return slides;
+    }
+
+    function parseMarkdownToSlides(markdown) {
+        const sections = markdown.split(/^---\s*$/m).filter(s => s.trim());
+        const t = SLIDE_THEMES[state.currentTheme];
+        return sections.map(section => {
+            const lines = section.trim().split('\n');
+            let title = '';
+            let content = [];
+            lines.forEach(line => {
+                const h1Match = line.match(/^#\s+(.+)/);
+                const h2Match = line.match(/^##\s+(.+)/);
+                if (h1Match && !title) {
+                    title = h1Match[1];
+                } else if (h2Match && !title) {
+                    title = h2Match[1];
+                } else {
+                    content.push(line);
+                }
+            });
+            const bodyContent = content.join('<br>\n');
+            return `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${t.background};color:${t.color};display:flex;flex-direction:column;justify-content:center;padding:60px;}.slide-title{font-size:36px;color:${t.h1Color};margin-bottom:24px;}.slide-content{font-size:20px;line-height:1.8;color:${t.color};}</style></head><body>${title ? `<div class="slide-title">${title}</div>` : ''}<div class="slide-content">${bodyContent}</div></body></html>`;
+        });
     }
 
     async function handleGenerate() {
@@ -627,14 +640,9 @@ RULES:
                     renderAll();
 
                     const commentary = response.replace(/<<<SLIDE>>>[\s\S]*?<<<END_SLIDE>>>/g, '').trim();
-                    if (commentary) {
-                        addChatMessage('assistant', `Generated ${parsedSlides.length} slide(s). ${commentary.substring(0, 200)}...`);
-                    } else {
-                        addChatMessage('assistant', `Generated ${parsedSlides.length} slide(s). You can now edit them or ask for changes.`);
-                    }
+                    addChatMessage('assistant', `Generated ${parsedSlides.length} slide(s). Switch to Edit mode to make changes.`);
                 } else {
-                    addChatMessage('assistant', response.substring(0, 500));
-                    addSystemMessage('Could not parse slides from the response. Try rephrasing or using a different generation mode.');
+                    addChatMessage('assistant', 'Could not parse slides from the response. Try rephrasing or using a different generation mode.');
                 }
             }
         } catch (e) {
@@ -658,7 +666,7 @@ RULES:
 
         if (!prompt) return;
         if (state.slides.length === 0) {
-            addErrorMessage('No slides to edit. Generate slides first.');
+            addErrorMessage('No slides to edit. Generate slides first or switch to Generate mode.');
             return;
         }
 
@@ -672,11 +680,11 @@ RULES:
 
         try {
             const currentSlide = state.slides[state.currentSlideIndex];
-            const editPrompt = `Here is the current slide HTML:\n\n${currentSlide}\n\nUser request: ${prompt}\n\nPlease return the modified slide HTML wrapped in <<<SLIDE>>> and <<<END_SLIDE>>> markers.`;
+            const editPrompt = `Here is the current slide HTML (slide ${state.currentSlideIndex + 1} of ${state.slides.length}):\n\n${currentSlide}\n\nUser request: ${prompt}\n\nPlease return the modified slide HTML wrapped in <<<SLIDE>>> and <<<END_SLIDE>>> markers.`;
 
             const loadingMsg = document.createElement('div');
             loadingMsg.className = 'chat-msg assistant';
-            loadingMsg.innerHTML = '<span class="loading-dots">Editing</span>';
+            loadingMsg.innerHTML = '<span class="loading-dots">Editing slide</span>';
             document.getElementById('chat-messages').appendChild(loadingMsg);
 
             const response = await sendToLLM(editPrompt, getEditSystemPrompt());
@@ -691,8 +699,7 @@ RULES:
                     renderAll();
                     addChatMessage('assistant', 'Slide updated successfully.');
                 } else {
-                    addChatMessage('assistant', 'Could not parse the edited slide. The response may still contain useful content.');
-                    addChatMessage('assistant', response.substring(0, 300));
+                    addChatMessage('assistant', 'Could not parse the edited slide. Try being more specific.');
                 }
             }
         } catch (e) {
@@ -712,7 +719,7 @@ RULES:
         const input = document.getElementById('chat-input').value.trim();
         if (!input) return;
 
-        if (state.slides.length === 0) {
+        if (state.currentMode === 'generate') {
             handleGenerate();
         } else {
             handleEdit();
@@ -720,37 +727,28 @@ RULES:
     }
 
     function applyThemeToSlide(slideHtml, theme) {
-        const t = SLIDE_THEMES[theme];
-        let html = slideHtml;
-
-        html = html.replace(/(background(?:-color)?\s*:\s*)([^;{}]+)([;}])/gi, `$1${t.background}$3`);
-        html = html.replace(/(color\s*:\s*)([^;{}]+)([;}])/gi, (match, prop, val, suff) => {
-            if (val.trim().toLowerCase() === t.accent.toLowerCase() || val.trim().toLowerCase() === t.h1Color.toLowerCase()) {
-                return match;
-            }
-            return `${prop}${t.color}${suff}`;
-        });
-
-        return html;
+        return slideHtml;
     }
 
     function switchView(view) {
         state.currentView = view;
         const previewArea = document.getElementById('slide-preview-area');
         const htmlArea = document.getElementById('slide-html-area');
-        const buttons = document.querySelectorAll('.view-btn');
+        const applyBtn = document.getElementById('apply-html-btn');
 
-        buttons.forEach(btn => {
+        document.querySelectorAll('.view-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === view);
         });
 
         if (view === 'html') {
             previewArea.style.display = 'none';
             htmlArea.style.display = '';
+            applyBtn.style.display = '';
             document.getElementById('slide-html-editor').value = state.slides[state.currentSlideIndex] || '';
         } else {
             previewArea.style.display = '';
             htmlArea.style.display = 'none';
+            applyBtn.style.display = 'none';
         }
     }
 
@@ -766,16 +764,120 @@ RULES:
         const iframe = document.createElement('iframe');
         iframe.sandbox = 'allow-scripts allow-same-origin';
         iframe.srcdoc = state.slides[state.currentSlideIndex];
-
         container.innerHTML = '';
         container.appendChild(iframe);
-
-        document.getElementById('pres-counter').textContent =
-            `${state.currentSlideIndex + 1} / ${state.slides.length}`;
+        document.getElementById('pres-counter').textContent = `${state.currentSlideIndex + 1} / ${state.slides.length}`;
     }
 
     function endPresentation() {
         document.getElementById('presentation-mode').style.display = 'none';
+    }
+
+    function loadTemplate(templateId) {
+        const template = BUILT_IN_TEMPLATES[templateId];
+        if (!template) return;
+
+        state.slides = [...template.slides];
+        state.currentSlideIndex = 0;
+        state.currentTheme = template.theme || 'dark';
+        saveSlides();
+        renderAll();
+        setMode('edit');
+        addSystemMessage(`Loaded template: ${template.name} (${template.slides.length} slides). Switch to Edit mode to customize.`);
+    }
+
+    function handleImport() {
+        const sourceType = document.getElementById('import-source-select').value;
+        const replaceAll = document.getElementById('import-replace-checkbox').checked;
+
+        if (sourceType === 'clipboard') {
+            const text = document.getElementById('import-clipboard-text').value.trim();
+            if (!text) { addErrorMessage('No content to import.'); return; }
+            importContent(text, 'auto', replaceAll);
+        } else {
+            const fileInput = document.getElementById('import-file');
+            if (!fileInput.files || !fileInput.files.length) { addErrorMessage('No file selected.'); return; }
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                importContent(e.target.result, sourceType, replaceAll);
+            };
+            reader.readAsText(file);
+        }
+
+        document.getElementById('import-modal').style.display = 'none';
+    }
+
+    function importContent(content, sourceType, replaceAll) {
+        let newSlides = [];
+
+        if (sourceType === 'template-json' || sourceType === 'auto') {
+            try {
+                const data = JSON.parse(content);
+                if (data.slides && Array.isArray(data.slides)) {
+                    newSlides = data.slides;
+                    if (data.theme) state.currentTheme = data.theme;
+                }
+            } catch (e) {
+                if (sourceType === 'template-json') {
+                    addErrorMessage('Invalid template JSON file.');
+                    return;
+                }
+            }
+        }
+
+        if (newSlides.length === 0 && (sourceType === 'slides-html' || sourceType === 'auto')) {
+            const htmlRegex = /<!DOCTYPE\s+html[^>]*>[\s\S]*?<\/html>/gi;
+            let match;
+            while ((match = htmlRegex.exec(content)) !== null) {
+                newSlides.push(match[0].trim());
+            }
+            if (newSlides.length === 0 && content.includes('<html')) {
+                newSlides.push(content.trim());
+            }
+        }
+
+        if (newSlides.length === 0 && (sourceType === 'slides-markdown' || sourceType === 'auto')) {
+            if (content.includes('---') || content.includes('#')) {
+                newSlides = parseMarkdownToSlides(content);
+            }
+        }
+
+        if (newSlides.length === 0) {
+            addErrorMessage('Could not parse any slides from the imported content.');
+            return;
+        }
+
+        if (replaceAll) {
+            state.slides = newSlides;
+        } else {
+            state.slides = state.slides.concat(newSlides);
+        }
+
+        state.currentSlideIndex = 0;
+        saveSlides();
+        renderAll();
+        addSystemMessage(`Imported ${newSlides.length} slide(s).`);
+    }
+
+    function handleExportTemplate() {
+        const title = document.getElementById('presentation-title').value || 'My Template';
+        const template = {
+            name: title,
+            description: `Exported from Canvas on ${new Date().toLocaleDateString()}`,
+            theme: state.currentTheme,
+            slides: state.slides
+        };
+        const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        addSystemMessage('Template exported successfully.');
     }
 
     function initEventListeners() {
@@ -789,6 +891,9 @@ RULES:
         });
 
         document.getElementById('refresh-models-btn').addEventListener('click', refreshModels);
+
+        document.getElementById('mode-generate-btn').addEventListener('click', () => setMode('generate'));
+        document.getElementById('mode-edit-btn').addEventListener('click', () => setMode('edit'));
 
         document.getElementById('chat-send-btn').addEventListener('click', handleSend);
         document.getElementById('chat-stop-btn').addEventListener('click', () => {
@@ -809,12 +914,7 @@ RULES:
                 reader.onload = (ev) => {
                     const img = new Image();
                     img.onload = () => {
-                        state.uploadedImages.push({
-                            name: file.name,
-                            data: ev.target.result,
-                            width: img.width,
-                            height: img.height
-                        });
+                        state.uploadedImages.push({ name: file.name, data: ev.target.result, width: img.width, height: img.height });
                         renderUploadedImages();
                     };
                     img.src = ev.target.result;
@@ -832,6 +932,15 @@ RULES:
             debounceUpdateSlide(e.target.value);
         });
 
+        document.getElementById('apply-html-btn').addEventListener('click', () => {
+            const val = document.getElementById('slide-html-editor').value;
+            state.slides[state.currentSlideIndex] = val;
+            saveSlides();
+            renderSlidePreview();
+            renderThumbnails();
+            addSystemMessage('HTML changes applied.');
+        });
+
         document.getElementById('add-slide-btn').addEventListener('click', () => addSlide());
         document.getElementById('delete-slide-btn').addEventListener('click', () => deleteSlide(state.currentSlideIndex));
         document.getElementById('move-slide-up-btn').addEventListener('click', () => moveSlide(state.currentSlideIndex, state.currentSlideIndex - 1));
@@ -839,38 +948,70 @@ RULES:
 
         document.getElementById('theme-select').addEventListener('change', (e) => {
             state.currentTheme = e.target.value;
-            state.slides = state.slides.map(html => applyThemeToSlide(html, state.currentTheme));
             saveSlides();
             renderAll();
         });
 
+        document.getElementById('layout-select').addEventListener('change', (e) => {
+            if (state.slides.length === 0) return;
+            const layout = e.target.value;
+            if (!layout) return;
+            const theme = SLIDE_THEMES[state.currentTheme];
+            const layouts = {
+                'title': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.container{text-align:center;padding:60px;}h1{font-size:56px;margin-bottom:16px;color:${theme.h1Color};}p{font-size:24px;color:${theme.color};opacity:0.8;}</style></head><body><div class="container"><h1>Title Here</h1><p>Subtitle goes here</p></div></body></html>`,
+                'title-content': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};padding:60px;}.title{font-size:36px;margin-bottom:30px;color:${theme.h2Color};border-bottom:3px solid ${theme.accent};padding-bottom:10px;display:inline-block;}.content{font-size:20px;line-height:1.8;}</style></head><body><div class="title">Slide Title</div><div class="content"><p>Content goes here</p></div></body></html>`,
+                'two-column': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};padding:60px;}.title{font-size:36px;margin-bottom:30px;color:${theme.h2Color};}.columns{display:flex;gap:40px;}.column{flex:1;}.column h3{color:${theme.accent};margin-bottom:12px;}.column p{font-size:18px;line-height:1.6;}</style></head><body><div class="title">Two Column Slide</div><div class="columns"><div class="column"><h3>Left Column</h3><p>Content here</p></div><div class="column"><h3>Right Column</h3><p>Content here</p></div></div></body></html>`,
+                'image-left': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.image-side{width:40%;background:#333;display:flex;align-items:center;justify-content:center;}.content-side{flex:1;padding:60px;display:flex;flex-direction:column;justify-content:center;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}</style></head><body><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div></body></html>`,
+                'image-right': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.content-side{flex:1;padding:60px;display:flex;flex-direction:column;justify-content:center;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}.image-side{width:40%;background:#333;display:flex;align-items:center;justify-content:center;}</style></head><body><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div></body></html>`,
+                'full-image': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#333;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;}.overlay{padding:40px;z-index:1;}.overlay h1{font-size:48px;margin-bottom:16px;}.overlay p{font-size:24px;opacity:0.9;}</style></head><body><div class="overlay"><h1>Full Image Slide</h1><p>Add an image behind this overlay</p></div></body></html>`,
+                'blank': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;align-items:center;justify-content:center;}</style></head><body><div style="padding:60px;text-align:center;"><h2 style="color:${theme.h2Color};font-size:32px;">Blank Slide</h2><p style="font-size:20px;margin-top:20px;">Add your content here</p></div></body></html>`
+            };
+            const layoutHtml = layouts[layout] || layouts['blank'];
+            state.slides[state.currentSlideIndex] = layoutHtml;
+            saveSlides();
+            renderAll();
+            e.target.value = '';
+        });
+
+
+
+        document.getElementById('import-template-btn').addEventListener('click', () => {
+            document.getElementById('import-modal').style.display = '';
+        });
+
+        document.getElementById('import-source-select').addEventListener('change', (e) => {
+            const val = e.target.value;
+            document.getElementById('import-file-area').style.display = (val === 'clipboard') ? 'none' : '';
+            document.getElementById('import-clipboard-area').style.display = (val === 'clipboard') ? '' : 'none';
+        });
+
+        document.getElementById('import-file').addEventListener('change', (e) => {
+            const fileName = e.target.files.length > 0 ? e.target.files[0].name : 'No file selected';
+            document.getElementById('import-file-name').textContent = fileName;
+        });
+
+        document.getElementById('import-confirm-btn').addEventListener('click', handleImport);
+        document.getElementById('import-cancel-btn').addEventListener('click', () => {
+            document.getElementById('import-modal').style.display = 'none';
+        });
+
+        document.getElementById('export-template-btn').addEventListener('click', handleExportTemplate);
+
         document.getElementById('present-btn').addEventListener('click', startPresentation);
         document.getElementById('pres-prev-btn').addEventListener('click', () => {
-            if (state.currentSlideIndex > 0) {
-                state.currentSlideIndex--;
-                showPresentationSlide();
-            }
+            if (state.currentSlideIndex > 0) { state.currentSlideIndex--; showPresentationSlide(); }
         });
         document.getElementById('pres-next-btn').addEventListener('click', () => {
-            if (state.currentSlideIndex < state.slides.length - 1) {
-                state.currentSlideIndex++;
-                showPresentationSlide();
-            }
+            if (state.currentSlideIndex < state.slides.length - 1) { state.currentSlideIndex++; showPresentationSlide(); }
         });
         document.getElementById('pres-exit-btn').addEventListener('click', endPresentation);
 
         document.addEventListener('keydown', (e) => {
             if (document.getElementById('presentation-mode').style.display !== 'none') {
                 if (e.key === 'ArrowRight' || e.key === ' ') {
-                    if (state.currentSlideIndex < state.slides.length - 1) {
-                        state.currentSlideIndex++;
-                        showPresentationSlide();
-                    }
+                    if (state.currentSlideIndex < state.slides.length - 1) { state.currentSlideIndex++; showPresentationSlide(); }
                 } else if (e.key === 'ArrowLeft') {
-                    if (state.currentSlideIndex > 0) {
-                        state.currentSlideIndex--;
-                        showPresentationSlide();
-                    }
+                    if (state.currentSlideIndex > 0) { state.currentSlideIndex--; showPresentationSlide(); }
                 } else if (e.key === 'Escape') {
                     endPresentation();
                 }
@@ -910,33 +1051,6 @@ RULES:
             document.getElementById('settings-modal').style.display = 'none';
         });
 
-        document.getElementById('layout-select').addEventListener('change', (e) => {
-            if (state.slides.length === 0) return;
-            const layout = e.target.value;
-            const theme = SLIDE_THEMES[state.currentTheme];
-            let layoutHtml = '';
-
-            const layouts = {
-                'title': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.container{text-align:center;padding:60px;}h1{font-size:56px;margin-bottom:16px;color:${theme.h1Color};}p{font-size:24px;color:${theme.color};opacity:0.8;}</style></head><body><div class="container"><h1>Title Here</h1><p>Subtitle goes here</p></div></body></html>`,
-                'title-content': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};padding:60px;}.title{font-size:36px;margin-bottom:30px;color:${theme.h2Color};border-bottom:3px solid ${theme.accent};padding-bottom:10px;display:inline-block;}.content{font-size:20px;line-height:1.8;}</style></head><body><div class="title">Slide Title</div><div class="content"><p>Content goes here</p></div></body></html>`,
-                'two-column': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};padding:60px;}.title{font-size:36px;margin-bottom:30px;color:${theme.h2Color};}.columns{display:flex;gap:40px;}.column{flex:1;}.column h3{color:${theme.accent};margin-bottom:12px;}.column p{font-size:18px;line-height:1.6;}</style></head><body><div class="title">Two Column Slide</div><div class="columns"><div class="column"><h3>Left Column</h3><p>Content here</p></div><div class="column"><h3>Right Column</h3><p>Content here</p></div></div></body></html>`,
-                'image-left': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.image-side{width:40%;background:#333;display:flex;align-items:center;justify-content:center;}.content-side{flex:1;padding:60px;display:flex;flex-direction:column;justify-content:center;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}</style></head><body><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div></body></html>`,
-                'image-right': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.content-side{flex:1;padding:60px;display:flex;flex-direction:column;justify-content:center;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}.image-side{width:40%;background:#333;display:flex;align-items:center;justify-content:center;}</style></head><body><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div></body></html>`,
-                'full-image': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#333;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;}.overlay{padding:40px;z-index:1;}.overlay h1{font-size:48px;margin-bottom:16px;}.overlay p{font-size:24px;opacity:0.9;}</style></head><body><div class="overlay"><h1>Full Image Slide</h1><p>Add an image behind this overlay</p></div></body></html>`,
-                'blank': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;align-items:center;justify-content:center;}</style></head><body><div style="padding:60px;text-align:center;"><h2 style="color:${theme.h2Color};font-size:32px;">Blank Slide</h2><p style="font-size:20px;margin-top:20px;">Add your content here</p></div></body></html>`
-            };
-
-            layoutHtml = layouts[layout] || layouts['blank'];
-
-            if (state.slides.length === 0) {
-                addSlide(layoutHtml);
-            } else {
-                state.slides[state.currentSlideIndex] = layoutHtml;
-                saveSlides();
-                renderAll();
-            }
-        });
-
         document.getElementById('export-pdf-btn').addEventListener('click', () => {
             if (typeof window.exportToPDF === 'function') {
                 window.exportToPDF(state.slides, document.getElementById('presentation-title').value);
@@ -960,7 +1074,6 @@ RULES:
         debounceTimer = setTimeout(() => {
             state.slides[state.currentSlideIndex] = value;
             saveSlides();
-            renderSlidePreview();
         }, 500);
     }
 
@@ -968,14 +1081,14 @@ RULES:
         loadSettings();
         if (!loadSlides()) {
             addSlide(DEFAULT_SLIDE_HTML);
-        } else {
-            state.slides = JSON.parse(localStorage.getItem('canvas_slides') || '[]');
-            if (state.slides.length === 0) addSlide(DEFAULT_SLIDE_HTML);
         }
         renderAll();
         refreshModels();
         initEventListeners();
-        addSystemMessage('Welcome to Canvas! Select a model provider and describe your presentation.');
+        setMode('generate');
+        renderTemplateButtons();
+        loadExternalTemplates();
+        addSystemMessage('Welcome to Canvas! Select a model and describe your presentation, or choose a template from the right panel.');
     }
 
     window.addEventListener('DOMContentLoaded', init);
