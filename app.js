@@ -117,6 +117,9 @@ p { font-size: 24px; color: #a0a0b0; }
         isGenerating: false,
         abortController: null,
         currentMode: 'generate',
+        currentSessionId: null,
+        sessions: [],
+        sidebarOpen: false,
         settings: {
             ollamaUrl: 'http://localhost:11434',
             openaiKey: '',
@@ -145,19 +148,151 @@ p { font-size: 24px; color: #a0a0b0; }
         localStorage.setItem('canvas_settings', JSON.stringify(state.settings));
     }
 
+    function loadSessions() {
+        try {
+            const saved = localStorage.getItem('canvas_sessions');
+            if (saved) state.sessions = JSON.parse(saved);
+        } catch (e) { }
+        const currentId = localStorage.getItem('canvas_current_session');
+        if (currentId) state.currentSessionId = currentId;
+    }
+
+    function saveSessions() {
+        localStorage.setItem('canvas_sessions', JSON.stringify(state.sessions));
+        if (state.currentSessionId) {
+            localStorage.setItem('canvas_current_session', state.currentSessionId);
+        }
+    }
+
+    function createSession(title) {
+        const id = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const session = {
+            id: id,
+            title: title || 'Untitled Presentation',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            slides: [DEFAULT_SLIDE_HTML],
+            currentSlideIndex: 0,
+            theme: 'dark',
+            chatHistory: []
+        };
+        state.sessions.unshift(session);
+        state.currentSessionId = id;
+        saveSessions();
+        loadSessionIntoState(session);
+        renderSessionList();
+        return id;
+    }
+
+    function switchSession(sessionId) {
+        saveCurrentSession();
+        state.currentSessionId = sessionId;
+        localStorage.setItem('canvas_current_session', sessionId);
+        const session = state.sessions.find(s => s.id === sessionId);
+        if (session) {
+            loadSessionIntoState(session);
+            renderSessionList();
+            renderAll();
+        }
+    }
+
+    function loadSessionIntoState(session) {
+        state.slides = [...session.slides];
+        state.currentSlideIndex = session.currentSlideIndex || 0;
+        state.currentTheme = session.theme || 'dark';
+        state.chatHistory = session.chatHistory || [];
+        document.getElementById('presentation-title').value = session.title || 'Untitled Presentation';
+        document.getElementById('chat-messages').innerHTML = '';
+        state.chatHistory.forEach(msg => {
+            const messagesDiv = document.getElementById('chat-messages');
+            const msgEl = document.createElement('div');
+            msgEl.className = `chat-msg ${msg.role}`;
+            msgEl.textContent = msg.content;
+            messagesDiv.appendChild(msgEl);
+        });
+        document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+    }
+
+    function saveCurrentSession() {
+        if (!state.currentSessionId) return;
+        const session = state.sessions.find(s => s.id === state.currentSessionId);
+        if (!session) return;
+        session.slides = [...state.slides];
+        session.currentSlideIndex = state.currentSlideIndex;
+        session.theme = state.currentTheme;
+        session.chatHistory = [...state.chatHistory];
+        session.title = document.getElementById('presentation-title').value || 'Untitled Presentation';
+        session.updatedAt = new Date().toISOString();
+        saveSessions();
+    }
+
+    function deleteSession(sessionId) {
+        if (state.sessions.length <= 1) return;
+        state.sessions = state.sessions.filter(s => s.id !== sessionId);
+        if (state.currentSessionId === sessionId) {
+            state.currentSessionId = state.sessions[0].id;
+            localStorage.setItem('canvas_current_session', state.currentSessionId);
+            loadSessionIntoState(state.sessions[0]);
+            renderAll();
+        }
+        saveSessions();
+        renderSessionList();
+    }
+
+    function renderSessionList() {
+        const container = document.getElementById('session-list');
+        if (!container) return;
+        container.innerHTML = '';
+        state.sessions.forEach(session => {
+            const item = document.createElement('div');
+            item.className = 'session-item' + (session.id === state.currentSessionId ? ' active' : '');
+            const date = new Date(session.updatedAt || session.createdAt);
+            const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            item.innerHTML = `<div class="session-item-title">${escapeHtml(session.title || 'Untitled')}</div><div class="session-item-meta">${session.slides ? session.slides.length : 0} slides | ${timeStr}</div><button class="session-item-delete" data-id="${session.id}" title="Delete">&times;</button>`;
+            item.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('session-item-delete')) {
+                    switchSession(session.id);
+                }
+            });
+            container.appendChild(item);
+        });
+        container.querySelectorAll('.session-item-delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteSession(btn.dataset.id);
+            });
+        });
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     function loadSlides() {
+        if (state.currentSessionId) {
+            const session = state.sessions.find(s => s.id === state.currentSessionId);
+            if (session && session.slides && session.slides.length > 0) {
+                loadSessionIntoState(session);
+                return true;
+            }
+        }
         try {
             const saved = localStorage.getItem('canvas_slides');
             if (saved) {
                 state.slides = JSON.parse(saved);
-                if (state.slides.length > 0) return true;
+                if (state.slides.length > 0) {
+                    createSession(document.getElementById('presentation-title').value || 'Migrated Presentation');
+                    return true;
+                }
             }
         } catch (e) { }
         return false;
     }
 
     function saveSlides() {
-        localStorage.setItem('canvas_slides', JSON.stringify(state.slides));
+        saveCurrentSession();
     }
 
     function addSlide(html) {
@@ -881,6 +1016,30 @@ RULES:
     }
 
     function initEventListeners() {
+        document.getElementById('sidebar-toggle-btn').addEventListener('click', () => {
+            state.sidebarOpen = !state.sidebarOpen;
+            document.getElementById('session-sidebar').classList.toggle('open', state.sidebarOpen);
+        });
+
+        document.getElementById('new-session-btn').addEventListener('click', () => {
+            saveCurrentSession();
+            createSession('New Presentation');
+            addSystemMessage('Started a new presentation session.');
+        });
+
+        document.getElementById('server-info-btn').addEventListener('click', () => {
+            document.getElementById('server-info-modal').style.display = '';
+        });
+
+        document.getElementById('server-info-close-btn').addEventListener('click', () => {
+            document.getElementById('server-info-modal').style.display = 'none';
+        });
+
+        document.getElementById('presentation-title').addEventListener('change', () => {
+            saveCurrentSession();
+            renderSessionList();
+        });
+
         document.getElementById('provider-select').addEventListener('change', (e) => {
             state.currentProvider = e.target.value;
             refreshModels();
@@ -1079,16 +1238,32 @@ RULES:
 
     function init() {
         loadSettings();
-        if (!loadSlides()) {
-            addSlide(DEFAULT_SLIDE_HTML);
+        loadSessions();
+        if (state.sessions.length === 0) {
+            createSession('Welcome Presentation');
+        } else {
+            if (!state.currentSessionId || !state.sessions.find(s => s.id === state.currentSessionId)) {
+                state.currentSessionId = state.sessions[0].id;
+            }
+            const session = state.sessions.find(s => s.id === state.currentSessionId);
+            if (session) {
+                loadSessionIntoState(session);
+            } else {
+                createSession('Welcome Presentation');
+            }
+        }
+        if (state.slides.length === 0) {
+            state.slides = [DEFAULT_SLIDE_HTML];
+            state.currentSlideIndex = 0;
         }
         renderAll();
+        renderSessionList();
         refreshModels();
         initEventListeners();
         setMode('generate');
         renderTemplateButtons();
         loadExternalTemplates();
-        addSystemMessage('Welcome to Canvas! Select a model and describe your presentation, or choose a template from the right panel.');
+        addSystemMessage('Welcome to Canvas! Select a model and describe your presentation, or choose a template.');
     }
 
     window.addEventListener('DOMContentLoaded', init);
