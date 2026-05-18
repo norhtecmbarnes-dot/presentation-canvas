@@ -482,6 +482,26 @@ p { font-size: 24px; color: #a0a0b0; }
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
+    function showGenerationOverlay(show) {
+        let overlay = document.getElementById('generation-overlay');
+        if (show) {
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'generation-overlay';
+                overlay.innerHTML = '<div class="gen-overlay-content"><div class="gen-spinner"></div><div class="gen-overlay-text">Generating presentation...</div><div class="gen-overlay-count" id="gen-overlay-count"></div></div>';
+                document.body.appendChild(overlay);
+            }
+            overlay.style.display = '';
+        } else {
+            if (overlay) overlay.style.display = 'none';
+        }
+    }
+
+    function updateGenerationOverlay(slideCount) {
+        const countEl = document.getElementById('gen-overlay-count');
+        if (countEl) countEl.textContent = `Slide ${slideCount} completed`;
+    }
+
     async function fetchOllamaModels() {
         try {
             const response = await fetch(`${state.settings.ollamaUrl}/api/tags`, {
@@ -795,12 +815,14 @@ RULES:
 
         if (!prompt) return;
 
-        const isFirstSlide = (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML);
+        const isDefault = (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML);
 
-        if (!isFirstSlide && state.slides.length > 0) {
-            const choice = confirm('You already have slides. Do you want to:\n\nOK = Replace all slides with new presentation\nCancel = Add new slides to the end');
+        if (!isDefault && state.slides.length > 0) {
+            const choice = confirm('You already have slides. Do you want to:\n\nOK = Replace all slides (new presentation)\nCancel = Add new slides to the end');
             if (choice) {
                 state.slides = [];
+                state.chatHistory = [];
+                document.getElementById('chat-messages').innerHTML = '';
             }
         }
 
@@ -811,6 +833,7 @@ RULES:
         sendBtn.disabled = true;
         sendBtn.style.display = 'none';
         stopBtn.style.display = '';
+        showGenerationOverlay(true);
 
         const streamMsg = document.createElement('div');
         streamMsg.className = 'chat-msg assistant';
@@ -833,7 +856,8 @@ RULES:
             }
 
             if (allParsedSlides.length > 0) {
-                streamMsg.textContent = `Generating slide ${allParsedSlides.length}...`;
+                streamMsg.textContent = `Generating... Slide ${allParsedSlides.length} completed`;
+                updateGenerationOverlay(allParsedSlides.length);
             } else {
                 streamMsg.innerHTML = '<span class="loading-dots">Generating</span>';
             }
@@ -864,7 +888,7 @@ RULES:
                     state.currentSlideIndex = 0;
                     saveSlides();
                     renderAll();
-                    streamMsg.textContent = `Done. Generated ${finalCount} slide(s). Switch to Edit mode to make changes.`;
+                    streamMsg.textContent = `Done. ${finalCount} slide(s) generated. Switch to Edit mode to make changes.`;
                 } else {
                     streamMsg.textContent = 'Could not parse slides from the response. Try rephrasing or using a different generation mode.';
                 }
@@ -885,6 +909,7 @@ RULES:
             stopBtn.style.display = 'none';
             state.abortController = null;
             state.onStreamToken = null;
+            showGenerationOverlay(false);
         }
     }
 
