@@ -576,7 +576,8 @@ p { font-size: 24px; color: #a0a0b0; }
     function buildMessages(systemPrompt, prompt) {
         const messages = [];
         if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-        const recentHistory = state.chatHistory.slice(-10);
+        const maxHistory = state.currentMode === 'edit' ? 10 : 4;
+        const recentHistory = state.chatHistory.slice(-maxHistory);
         recentHistory.forEach(msg => {
             if (msg.role === 'user' || msg.role === 'assistant') {
                 messages.push({ role: msg.role, content: msg.content });
@@ -753,6 +754,17 @@ RULES:
 
         if (!prompt) return;
 
+        const isFirstSlide = (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML);
+
+        if (!isFirstSlide && state.slides.length > 0) {
+            const choice = confirm('You already have slides. Do you want to:\n\nOK = Replace all slides with new presentation\nCancel = Add new slides to the end');
+            if (!choice) {
+                // append mode - continue below
+            } else {
+                state.slides = [];
+            }
+        }
+
         addChatMessage('user', prompt);
         input.value = '';
 
@@ -779,17 +791,12 @@ RULES:
                 const parsedSlides = parseSlidesFromResponse(response);
 
                 if (parsedSlides.length > 0) {
-                    if (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML) {
-                        state.slides = parsedSlides;
-                    } else {
-                        state.slides = state.slides.concat(parsedSlides);
-                    }
+                    state.slides = state.slides.concat(parsedSlides);
                     state.currentSlideIndex = 0;
                     saveSlides();
                     renderAll();
 
-                    const commentary = response.replace(/<<<SLIDE>>>[\s\S]*?<<<END_SLIDE>>>/g, '').trim();
-                    addChatMessage('assistant', `Generated ${parsedSlides.length} slide(s). Switch to Edit mode to make changes.`);
+                    addChatMessage('assistant', `Generated ${parsedSlides.length} slide(s). You now have ${state.slides.length} total slides. Switch to Edit mode to make changes.`);
                 } else {
                     addChatMessage('assistant', 'Could not parse slides from the response. Try rephrasing or using a different generation mode.');
                 }
