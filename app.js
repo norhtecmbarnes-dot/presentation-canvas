@@ -941,7 +941,51 @@ CONTENT RULES:
 - Prioritize visuals + headlines over walls of text.
 - Use bold years/events, short powerful bullets, and clear visual hierarchy.
 - Automatically create logical flow (title, agenda, content slides, summary).
-- Add a small footer with slide number and presentation title on every slide (except title slide) for professionalism.`;
+- Add a small footer with slide number and presentation title on every slide (except title slide) for professionalism.
+
+═══════════════════════════════════════════
+GOVERNMENT BID MODE (auto-detect)
+═══════════════════════════════════════════
+Activate this mode automatically when the user mentions any of: "gov bid", "government proposal", "compact bid", "quad chart", "limited slides", or any government/defense/military bidding context.
+
+When GOVERNMENT BID MODE is active:
+- Maximum 5 slides total unless the user explicitly requests more.
+- Extreme conciseness: maximum 4 short bullets per slide, large readable fonts, heavy visuals/icons, minimal text.
+- Dense but scannable: perfect for government reviewers who hate wordy decks.
+- Override theme to government-contractor style unless user specifies otherwise:
+  --bg:#1a2744; --text:#ffffff; --accent:#4a90d9; --h1:#ffffff; --h2:#7eb8e6;
+  Use dark navy backgrounds, clean white text, strong contrast, no decorative flourishes.
+- If in SCRIPT or MARKDOWN mode, ask the user in the outline whether they want any quad charts included.
+
+═══════════════════════════════════════════
+QUAD CHART (special slide type)
+═══════════════════════════════════════════
+When the user asks for a "quad chart", "quadrant chart", or includes "quad" in the request, create a single professional quad chart slide using CSS Grid.
+
+QUAD CHART LAYOUT RULES:
+- Title centered at the top in large bold font.
+- Content area divided into exactly 4 equal quadrants using CSS Grid (2x2).
+- Label each quadrant clearly in the top-left corner with a bold header.
+- Each quadrant: one bold title + max 3-4 very short bullets or key phrases + optional small inline SVG icon.
+- Use subtle borders and background shading to separate the four quadrants cleanly.
+- Professional, military/government-friendly style: clean lines, high contrast, no fluff.
+- Must still use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
+
+Default Quad Chart quadrants (use unless user specifies different ones):
+1. Top-Left:     PROBLEM / REQUIREMENT
+2. Top-Right:    SOLUTION / APPROACH
+3. Bottom-Left:  BENEFITS / VALUE
+4. Bottom-Right: TIMELINE / COST / NEXT STEPS
+
+QUAD CHART CSS TEMPLATE:
+body { display:flex; flex-direction:column; width:960px; height:540px; }
+.header { text-align:center; padding:12px; }
+.grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:2px; flex:1; padding:0 8px 8px; }
+.quad { padding:16px; background:var(--bg-secondary); border:1px solid var(--border); }
+.quad h3 { font-size:16px; margin-bottom:8px; color:var(--accent); }
+.quad li { font-size:13px; line-height:1.6; }
+
+Allow the user to override quadrant titles or color scheme on any quad chart request.`;
 
         if (mode === 'script') {
             return basePrompt + `
