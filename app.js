@@ -176,7 +176,7 @@ p { font-size: 24px; color: #a0a0b0; }
             title: title || 'Untitled Presentation',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            slides: [DEFAULT_SLIDE_HTML],
+            slides: [],
             currentSlideIndex: 0,
             theme: 'dark',
             chatHistory: []
@@ -185,12 +185,17 @@ p { font-size: 24px; color: #a0a0b0; }
         state.currentSessionId = id;
         state.chatHistory = [];
         state.uploadedImages = [];
+        state.slides = [];
+        state.currentSlideIndex = 0;
         const messagesDiv = document.getElementById('chat-messages');
         messagesDiv.innerHTML = '';
+        document.getElementById('presentation-title').value = session.title;
+        const themeSelect = document.getElementById('theme-select');
+        if (themeSelect) themeSelect.value = state.currentTheme;
+        const modeSelect = document.getElementById('gen-mode-select');
+        if (modeSelect) modeSelect.value = state.currentMode || 'slides';
         saveSessions();
-        loadSessionIntoState(session);
-        addSlide(DEFAULT_SLIDE_HTML);
-        state.currentSlideIndex = 0;
+        renderAll();
         renderSessionList();
         return id;
     }
@@ -1285,12 +1290,10 @@ body { background: #111; overflow: hidden; }
             createSession(newTitle);
         }
 
-        // Clear any default slide so generated slides replace it
-        if (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML) {
-            state.slides = [];
-            state.currentSlideIndex = 0;
-            renderAll();
-        }
+        // Always clear slides before generating — we're replacing them
+        state.slides = [];
+        state.currentSlideIndex = 0;
+        renderAll();
 
         addChatMessage('user', prompt);
         input.value = '';
