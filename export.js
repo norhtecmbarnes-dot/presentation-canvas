@@ -188,66 +188,62 @@ body { background: #333; }
 
     function renderSlideToPng(slideHtml) {
         return new Promise((resolve) => {
-            // Primary approach: iframe with html2canvas/html-to-image targeting body
             const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:absolute;left:-9999px;top:0;width:960px;height:540px;border:none;';
+            // Keep iframe on-screen (behind overlay) so browser paints it
+            iframe.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px;border:none;z-index:-1;opacity:0;pointer-events:none;';
             document.body.appendChild(iframe);
+
+            // Use onload event — not readyState (which fires before paint for doc.write)
+            iframe.onload = () => {
+                // Wait 2 frames for layout/paint to complete
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(async () => {
+                        try {
+                            if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
+                                const dataUrl = await htmlToImage.toPng(iframe.contentDocument.body, {
+                                    width: 960,
+                                    height: 540,
+                                    pixelRatio: 2,
+                                    backgroundColor: null
+                                });
+                                iframe.remove();
+                                resolve(dataUrl);
+                                return;
+                            }
+                            if (typeof html2canvas !== 'undefined') {
+                                const canvas = await html2canvas(iframe.contentDocument.body, {
+                                    width: 960,
+                                    height: 540,
+                                    scale: 2,
+                                    backgroundColor: null,
+                                    useCORS: false,
+                                    allowTaint: true,
+                                    logging: false,
+                                    foreignObjectRendering: true,
+                                    scrollX: 0,
+                                    scrollY: 0,
+                                    windowWidth: 960,
+                                    windowHeight: 540
+                                });
+                                iframe.remove();
+                                resolve(canvas.toDataURL('image/png'));
+                                return;
+                            }
+                            iframe.remove();
+                            resolve(await divRenderFallback(slideHtml));
+                        } catch (e) {
+                            console.warn('iframe render failed, trying div fallback:', e);
+                            try { iframe.remove(); } catch(ex) {}
+                            resolve(await divRenderFallback(slideHtml));
+                        }
+                    });
+                });
+            };
 
             const doc = iframe.contentDocument;
             doc.open();
             doc.write(slideHtml);
             doc.close();
-
-            const waitForReady = () => new Promise(r => {
-                if (doc.readyState === 'complete') r();
-                else doc.addEventListener('DOMContentLoaded', r, { once: true });
-            });
-
-            waitForReady().then(async () => {
-                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-                try {
-                    if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
-                        const dataUrl = await htmlToImage.toPng(doc.body, {
-                            width: 960,
-                            height: 540,
-                            pixelRatio: 2,
-                            backgroundColor: null
-                        });
-                        iframe.remove();
-                        resolve(dataUrl);
-                        return;
-                    }
-                    if (typeof html2canvas !== 'undefined') {
-                        const canvas = await html2canvas(doc.body, {
-                            width: 960,
-                            height: 540,
-                            scale: 2,
-                            backgroundColor: null,
-                            useCORS: false,
-                            allowTaint: true,
-                            logging: false,
-                            foreignObjectRendering: true,
-                            scrollX: 0,
-                            scrollY: 0,
-                            windowWidth: 960,
-                            windowHeight: 540,
-                            onclone: (clonedDoc) => {
-                                console.log('html2canvas cloned body styles:', clonedDoc.body.style.cssText);
-                            }
-                        });
-                        iframe.remove();
-                        resolve(canvas.toDataURL('image/png'));
-                        return;
-                    }
-                    iframe.remove();
-                    resolve(await divRenderFallback(slideHtml));
-                } catch (e) {
-                    console.warn('iframe render failed, trying div fallback:', e);
-                    try { iframe.remove(); } catch(ex) {}
-                    resolve(await divRenderFallback(slideHtml));
-                }
-            });
         });
     }
 
