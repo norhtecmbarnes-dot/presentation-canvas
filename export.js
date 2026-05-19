@@ -181,8 +181,33 @@ body { background: #333; }
 
     function renderSlideToPng(slideHtml, container) {
         return new Promise((resolve) => {
+            // Extract background color from the slide HTML for html2canvas
+            let bgForCanvas = '#1a1a2e';
+            const parser = new DOMParser();
+            try {
+                const parsed = parser.parseFromString(slideHtml, 'text/html');
+                const styleEl = parsed.querySelector('style');
+                if (styleEl) {
+                    const cssText = styleEl.textContent;
+                    // Match CSS variable --bg
+                    const varBg = cssText.match(/--bg\s*:\s*([^;}\n]+)/);
+                    if (varBg) bgForCanvas = varBg[1].trim();
+                    // Match body background
+                    const bodyBg = cssText.match(/body\s*\{[^}]*background(?:-color)?\s*:\s*([^;}\n]+)/);
+                    if (bodyBg) bgForCanvas = bodyBg[1].trim();
+                    // Match linear-gradient - extract first color
+                    const gradBg = cssText.match(/background\s*:\s*linear-gradient\([^,]+,\s*([^,\s)]+)/);
+                    if (gradBg) bgForCanvas = gradBg[1].trim();
+                }
+                const bodyEl = parsed.querySelector('body');
+                if (bodyEl) {
+                    const inlineBg = bodyEl.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;}"']+)/);
+                    if (inlineBg) bgForCanvas = inlineBg[1].trim();
+                }
+            } catch (e) { /* use default */ }
+
             const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'width:960px;height:540px;border:none;position:absolute;top:0;left:0;background:white;';
+            iframe.style.cssText = 'width:960px;height:540px;border:none;position:absolute;top:0;left:0;';
             iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
 
             const cleanup = () => {
@@ -190,36 +215,52 @@ body { background: #333; }
             };
 
             iframe.onload = () => {
-                // Wait for fonts, images, CSS to settle
                 setTimeout(async () => {
                     try {
                         const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
                         const iframeBody = iframeDoc.body || iframeDoc.documentElement;
 
-                        // Use html2canvas on the iframe's body
+                        // Inject a solid background-color on the body for html2canvas compatibility
+                        // html2canvas doesn't render linear-gradient well, so we extract the dominant color
+                        try {
+                            const iframeStyle = iframeDoc.querySelector('style');
+                            if (iframeStyle) {
+                                // Replace linear-gradient backgrounds with solid colors for rendering
+                                let css = iframeStyle.textContent;
+                                // Common pattern: background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)
+                                css = css.replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+                                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
+                                    if (colors && colors.length > 0) {
+                                        return `background: ${colors[0]}`;
+                                    }
+                                    return match;
+                                });
+                                // Also handle background: ... linear-gradient in inline styles
+                                iframeStyle.textContent = css;
+                            }
+                        } catch (e) { /* ignore */ }
+
                         const canvas = await html2canvas(iframeBody, {
                             width: 960,
                             height: 540,
                             scale: 2,
                             useCORS: true,
                             allowTaint: true,
-                            backgroundColor: null,
+                            backgroundColor: bgForCanvas,
                             logging: false,
                             windowWidth: 960,
-                            windowHeight: 540
+                            windowHeight: 540,
+                            removeContainer: true
                         });
 
                         cleanup();
-
-                        // Return as PNG data URL
                         resolve(canvas.toDataURL('image/png'));
                     } catch (e) {
                         console.warn('html2canvas failed, trying fallback:', e);
                         cleanup();
-                        // Fallback: try direct canvas approach
                         resolve(await fallbackRender(slideHtml));
                     }
-                }, 1500);
+                }, 2000);
             };
 
             container.appendChild(iframe);
