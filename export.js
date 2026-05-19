@@ -93,24 +93,36 @@ body { background: #333; }
         document.body.appendChild(overlay);
         const progress = overlay.querySelector('#pptx-progress');
 
-        // Load rendering libraries: html2canvas (primary), html-to-image (fallback)
-        if (typeof html2canvas === 'undefined') {
+        // Load rendering libraries: dom-to-image-more (primary), html2canvas (backup)
+        if (typeof domtoimage === 'undefined') {
             try {
-                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+                await loadScript('https://www.npmcdn.org/dom-to-image-more/dom-to-image-more.umd.min.js');
             } catch (e) {
                 try {
-                    await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+                    await loadScript('https://cdn.jsdelivr.net/npm/dom-to-image-more@4.3.0/dist/dom-to-image-more.umd.min.js');
                 } catch (e2) {
-                    // Try html-to-image as fallback
-                    if (typeof htmlToImage === 'undefined') {
+                    // Fall back to html2canvas
+                    if (typeof html2canvas === 'undefined') {
                         try {
-                            await loadScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js');
+                            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
                         } catch (e3) {
-                            overlay.remove();
-                            alert('Failed to load rendering libraries. Opening HTML export instead.');
-                            fallbackHtmlExport(slides, title);
-                            return;
+                            try {
+                                await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+                            } catch (e4) {
+                                // Try html-to-image
+                                if (typeof htmlToImage === 'undefined') {
+                                    try {
+                                        await loadScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js');
+                                    } catch (e5) {
+                                        // Will use iframe/doc write fallback
+                                    }
+                                }
+                            }
                         }
+                    }
+                }
+            }
+        }
                     }
                 }
             }
@@ -254,6 +266,20 @@ body { background: #333; }
                 // Wait for CSS paint
                 await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
+                // Try dom-to-image-more first (more reliable)
+                if (typeof domtoimage !== 'undefined' && domtoimage) {
+                    try {
+                        domtoimage.toBlob(wrapper, (blob) => {
+                            wrapper.remove();
+                            resolve(blob ? blob.toDataURL('image/png') : 'image/png');
+                        }, 'image/png', 2);
+                        return;
+                    } catch (e) {
+                        console.warn('dom-to-image-more failed:', e);
+                    }
+                }
+
+                // Fallback to html2canvas
                 if (typeof html2canvas !== 'undefined') {
                     const canvas = await html2canvas(wrapper, {
                         width: 960,
@@ -273,6 +299,7 @@ body { background: #333; }
                     return;
                 }
 
+                // Fallback to html-to-image
                 if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
                     const dataUrl = await htmlToImage.toPng(wrapper, {
                         width: 960,
@@ -284,8 +311,6 @@ body { background: #333; }
                     resolve(dataUrl);
                     return;
                 }
-
-                wrapper.remove();
             } catch (e) {
                 console.warn('Div render failed:', e);
             }
