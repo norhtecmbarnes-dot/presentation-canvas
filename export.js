@@ -189,15 +189,13 @@ body { background: #333; }
     function renderSlideToPng(slideHtml) {
         return new Promise((resolve) => {
             const iframe = document.createElement('iframe');
-            // Keep iframe on-screen (behind overlay) so browser paints it
-            iframe.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px;border:none;z-index:-1;opacity:0;pointer-events:none;';
+            // Visible but behind progress overlay (z-index:9999) — browser must paint it
+            iframe.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px;border:none;z-index:9998;background:white;';
             document.body.appendChild(iframe);
 
-            // Use onload event — not readyState (which fires before paint for doc.write)
+            // Use onload event then wait 500ms for full paint
             iframe.onload = () => {
-                // Wait 2 frames for layout/paint to complete
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(async () => {
+                setTimeout(async () => {
                         try {
                             if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
                                 const dataUrl = await htmlToImage.toPng(iframe.contentDocument.body, {
@@ -236,8 +234,7 @@ body { background: #333; }
                             try { iframe.remove(); } catch(ex) {}
                             resolve(await divRenderFallback(slideHtml));
                         }
-                    });
-                });
+                    }, 500);
             };
 
             const doc = iframe.contentDocument;
