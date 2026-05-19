@@ -1,152 +1,6 @@
 (function () {
     'use strict';
 
-    const PPTX_THEMES = {
-        dark: { background: '1A1A2E', title: 'FFFFFF', text: 'E0E0E0', accent: '4FC3F7', h2: '4FC3F7' },
-        light: { background: 'FFFFFF', title: '111111', text: '222222', accent: '1976D2', h2: '1976D2' },
-        blue: { background: '0D47A1', title: 'FFFFFF', text: 'E3F2FD', accent: 'FFCA28', h2: 'FFCA28' },
-        green: { background: '1B5E20', title: 'FFFFFF', text: 'E8F5E9', accent: 'FFCA28', h2: 'A5D6A7' },
-        red: { background: 'B71C1C', title: 'FFFFFF', text: 'FFEbee', accent: 'FFCDD2', h2: 'FFCDD2' }
-    };
-
-    function parseSlideHtml(html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-
-        const styleTag = doc.querySelector('style');
-        const css = styleTag ? styleTag.textContent : '';
-
-        const cssVars = {};
-        const varMatches = css.matchAll(/--([\w-]+)\s*:\s*([^;}\n]+)/g);
-        for (const m of varMatches) {
-            let val = m[2].trim();
-            for (const [k, v] of Object.entries(cssVars)) {
-                val = val.replace(`var(--${k})`, v);
-            }
-            cssVars[m[1]] = val;
-        }
-
-        function resolveColor(str) {
-            if (!str) return null;
-            str = String(str).trim();
-            const varRef = str.match(/var\(--([\w-]+)\)/);
-            if (varRef && cssVars[varRef[1]]) str = cssVars[varRef[1]];
-            return parseCssColor(str);
-        }
-
-        let bgColor = null;
-        let textColor = null;
-        let accentColor = null;
-        let h1Color = null;
-        let h2Color = null;
-
-        const bodyEl = doc.querySelector('body');
-        if (bodyEl) {
-            const bs = bodyEl.style;
-            if (bs.background) bgColor = resolveColor(bs.background.split(',')[0]);
-            if (bs.backgroundColor) bgColor = resolveColor(bs.backgroundColor);
-            if (bs.color) textColor = resolveColor(bs.color);
-        }
-
-        if (styleTag) {
-            const bgMatch = css.match(/body\s*\{[^}]*background(?:-color)?\s*:\s*([^;}]+)/);
-            if (bgMatch && !bgColor) {
-                let val = bgMatch[1].trim();
-                if (val.startsWith('linear-gradient')) {
-                    const cm = val.match(/(?:to\s+\w+\s*,)?\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|[\w]+)/);
-                    if (cm) bgColor = resolveColor(cm[1]);
-                } else {
-                    bgColor = resolveColor(val);
-                }
-            }
-            const colorMatch = css.match(/body\s*\{[^}]*\bcolor\s*:\s*([^;}]+)/);
-            if (colorMatch && !textColor) textColor = resolveColor(colorMatch[1].trim());
-            if (cssVars.bg) bgColor = bgColor || resolveColor(cssVars.bg);
-            if (cssVars.text) textColor = textColor || resolveColor(cssVars.text);
-            if (cssVars.accent) accentColor = resolveColor(cssVars.accent);
-            if (cssVars.h1) h1Color = resolveColor(cssVars.h1);
-            if (cssVars.h2) h2Color = resolveColor(cssVars.h2);
-        }
-
-        if (!bgColor) bgColor = 'FFFFFF';
-        if (!textColor) textColor = '000000';
-
-        const headings = doc.querySelectorAll('h1, h2, h3');
-        const title = headings.length > 0 ? headings[0].textContent.trim() : 'Slide';
-
-        const texts = [];
-        const processedTexts = new Set();
-
-        headings.forEach(h => {
-            const t = h.textContent.trim();
-            if (t && !processedTexts.has(t)) {
-                processedTexts.add(t);
-                const col = resolveColor(h.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || h1Color || accentColor || textColor;
-                const sz = parseInt(h.getAttribute('style')?.match(/font-size\s*:\s*(\d+)/)?.[1]) || (h.tagName === 'H1' ? 44 : h.tagName === 'H2' ? 32 : 24);
-                texts.push({ type: 'title', text: t, fontSize: sz, bold: true, color: col });
-            }
-        });
-
-        doc.querySelectorAll('p').forEach(p => {
-            if (p.querySelector('h1,h2,h3,h4,h5,h6')) return;
-            const t = p.textContent.trim();
-            if (!t || processedTexts.has(t)) return;
-            processedTexts.add(t);
-            const col = resolveColor(p.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || textColor;
-            texts.push({ type: 'body', text: t, fontSize: 18, bold: false, color: col });
-        });
-
-        doc.querySelectorAll('li').forEach(li => {
-            const t = li.textContent.trim();
-            if (!t || processedTexts.has(t)) return;
-            processedTexts.add(t);
-            const col = resolveColor(li.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || resolveColor(li.parentElement?.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || textColor;
-            texts.push({ type: 'bullet', text: t, fontSize: 16, bold: false, color: col });
-        });
-
-        const images = [];
-        doc.querySelectorAll('img').forEach(img => {
-            const src = img.getAttribute('src') || '';
-            if (src.startsWith('data:image')) images.push(src);
-        });
-
-        return { title, texts, bgColor, textColor, accentColor, h1Color: h1Color || accentColor, h2Color: h2Color || accentColor, images };
-    }
-
-    function parseCssColor(str) {
-        if (!str) return null;
-        str = String(str).trim();
-        let hexMatch = str.match(/#([0-9a-fA-F]{3,8})/);
-        if (hexMatch) {
-            let hex = hexMatch[1];
-            if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-            if (hex.length >= 6) hex = hex.substring(0, 6);
-            return hex.toUpperCase();
-        }
-        const rgbMatch = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-        if (rgbMatch) {
-            const r = parseInt(rgbMatch[1]).toString(16).padStart(2, '0');
-            const g = parseInt(rgbMatch[2]).toString(16).padStart(2, '0');
-            const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
-            return (r + g + b).toUpperCase();
-        }
-        const named = { white:'FFFFFF',black:'000000',red:'FF0000',green:'008000',blue:'0000FF',navy:'000080',gray:'808080',grey:'808080',yellow:'FFFF00',orange:'FFA500',purple:'800080',cyan:'00FFFF' };
-        return named[str.toLowerCase()] || null;
-    }
-
-    function isLightColor(hex) {
-        if (!hex) return true;
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-        return (r * 299 + g * 587 + b * 114) / 1000 > 128;
-    }
-
-    function getC(hex) {
-        if (!hex || hex.length < 6) return '000000';
-        return hex.substring(0, 6).toUpperCase();
-    }
-
     window.exportToPDF = function (slides, title) {
         if (!slides || slides.length === 0) { alert('No slides to export.'); return; }
 
@@ -231,94 +85,87 @@ body { background: #333; }
     window.exportToPPTX = async function (slides, title) {
         if (!slides || slides.length === 0) { alert('No slides to export.'); return; }
 
-        let PptxGenJS = window.PptxGenJS;
-        if (!PptxGenJS) {
+        // Show progress overlay
+        const overlay = document.createElement('div');
+        overlay.id = 'export-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"Segoe UI",sans-serif;';
+        overlay.innerHTML = '<div style="background:#1a1a2e;border:1px solid #4fc3f7;border-radius:16px;padding:30px 40px;text-align:center;max-width:400px;"><div style="width:32px;height:32px;border:3px solid #333;border-top-color:#4fc3f7;border-radius:50%;animation:gen-spin 0.8s linear infinite;margin:0 auto 16px;"></div><div style="color:#4fc3f7;font-size:16px;font-weight:600;">Rendering slides...</div><div id="pptx-progress" style="color:#a0a0b0;font-size:13px;margin-top:8px;">Preparing 0 / ' + slides.length + '</div></div>';
+        document.body.appendChild(overlay);
+        const progress = overlay.querySelector('#pptx-progress');
+
+        // Load html2canvas if needed
+        if (typeof html2canvas === 'undefined') {
+            try {
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+            } catch (e) {
+                try {
+                    await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
+                } catch (e2) {
+                    overlay.remove();
+                    alert('Failed to load html2canvas library. Opening HTML export instead.');
+                    fallbackHtmlExport(slides, title);
+                    return;
+                }
+            }
+        }
+
+        // Load PptxGenJS if needed
+        if (typeof PptxGenJS === 'undefined') {
             try {
                 await loadScript('https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js');
-                PptxGenJS = window.PptxGenJS;
             } catch (e) {
-                alert('Failed to load PptxGenJS. Opening HTML export instead.');
+                overlay.remove();
+                alert('Failed to load PptxGenJS library. Opening HTML export instead.');
                 fallbackHtmlExport(slides, title);
                 return;
             }
         }
 
+        // Render each slide to an image
+        const slideImages = [];
+        const hiddenContainer = document.createElement('div');
+        hiddenContainer.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:10000px;height:10000px;overflow:visible;';
+        document.body.appendChild(hiddenContainer);
+
+        for (let i = 0; i < slides.length; i++) {
+            if (progress) progress.textContent = `Rendering ${i + 1} / ${slides.length}`;
+
+            try {
+                const dataUrl = await renderSlideToPng(slides[i], hiddenContainer);
+                slideImages.push(dataUrl);
+            } catch (e) {
+                console.warn('Failed to render slide', i, e);
+                slideImages.push(null);
+            }
+        }
+
+        hiddenContainer.remove();
+
+        // Build PPTX with slide images
         try {
             const pptx = new PptxGenJS();
-            pptx.layout = 'LAYOUT_WIDE';
+            pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches (16:9)
             pptx.title = title || 'Presentation';
             pptx.author = 'Canvas';
+            pptx.subject = 'Generated by Canvas AI';
 
-            const parsedSlides = slides.map(html => parseSlideHtml(html));
-
-            parsedSlides.forEach((slide) => {
-                const pptSlide = pptx.addSlide();
-                pptSlide.background = { color: getC(slide.bgColor) };
-
-                const hasDarkBg = !isLightColor(slide.bgColor);
-                const defaultTextColor = hasDarkBg ? 'FFFFFF' : '000000';
-                const defaultAccent = hasDarkBg ? (slide.accentColor || '4FC3F7') : (slide.accentColor || '1976D2');
-
-                let yPos = 0.4;
-                const leftMargin = 0.6;
-                const contentWidth = 12.13;
-
-                const titleTexts = slide.texts.filter(t => t.type === 'title');
-                if (titleTexts.length > 0) {
-                    const titleSize = Math.min(titleTexts[0].fontSize || 44, 44);
-                    const titleColor = getC(titleTexts[0].color) || getC(slide.h1Color) || getC(slide.accentColor) || defaultAccent;
-
-                    pptSlide.addText(titleTexts.map(t => ({
-                        text: t.text,
-                        options: { fontSize: Math.min(t.fontSize || 44, 44), bold: true, color: getC(t.color) || titleColor, fontFace: 'Calibri Light', breakType: 'none' }
-                    })), {
-                        x: leftMargin,
-                        y: yPos,
-                        w: contentWidth,
-                        h: titleSize * 0.028,
-                        valign: 'bottom'
+            slideImages.forEach((imgData, i) => {
+                const slide = pptx.addSlide();
+                if (imgData) {
+                    slide.addImage({
+                        data: imgData,
+                        x: 0,
+                        y: 0,
+                        w: 13.33,
+                        h: 7.5
                     });
-                    yPos += titleSize * 0.028 + 0.15;
+                } else {
+                    slide.background = { color: '1A1A2E' };
+                    slide.addText('Slide ' + (i + 1) + ' - rendering failed', {
+                        x: 1, y: 2.5, w: 11.33, h: 2.5,
+                        fontSize: 32, color: 'FF0000', align: 'center', bold: true
+                    });
                 }
-
-                const bodyTexts = slide.texts.filter(t => t.type !== 'title');
-                if (bodyTexts.length > 0) {
-                    const textColor = getC(bodyTexts[0].color) || defaultTextColor;
-                    const bodyHeight = 7.5 - yPos - 0.4;
-                    if (bodyHeight > 0) {
-                        const textRows = bodyTexts.map(t => {
-                            const sz = Math.min(t.fontSize || 18, 24);
-                            return {
-                                text: t.text,
-                                options: {
-                                    fontSize: sz,
-                                    color: getC(t.color) || textColor,
-                                    bullet: t.type === 'bullet',
-                                    bold: t.bold || t.type === 'title',
-                                    fontFace: 'Calibri',
-                                    paraSpaceAfter: 4
-                                }
-                            };
-                        });
-
-                        pptSlide.addText(textRows, {
-                            x: leftMargin,
-                            y: yPos,
-                            w: contentWidth,
-                            h: bodyHeight > 0 ? bodyHeight : 3,
-                            valign: 'top',
-                            fontFace: 'Calibri'
-                        });
-                    }
-                }
-
-                slide.images.forEach(imgSrc => {
-                    try {
-                        pptSlide.addImage({ data: imgSrc, x: 1.5, y: 1.5, w: 4, h: 3, sizing: { type: 'contain', w: 4, h: 3 } });
-                    } catch (e) {
-                        console.warn('Could not add image to slide:', e);
-                    }
-                });
             });
 
             await pptx.writeFile({ fileName: `${(title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_')}.pptx` });
@@ -328,7 +175,134 @@ body { background: #333; }
             alert('Error creating PPTX: ' + e.message + '\n\nOpening HTML export instead.');
             fallbackHtmlExport(slides, title);
         }
+
+        overlay.remove();
     };
+
+    function renderSlideToPng(slideHtml, container) {
+        return new Promise((resolve) => {
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'width:960px;height:540px;border:none;position:absolute;top:0;left:0;background:white;';
+            iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+
+            const cleanup = () => {
+                try { iframe.remove(); } catch (e) { }
+            };
+
+            iframe.onload = () => {
+                // Wait for fonts, images, CSS to settle
+                setTimeout(async () => {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const iframeBody = iframeDoc.body || iframeDoc.documentElement;
+
+                        // Use html2canvas on the iframe's body
+                        const canvas = await html2canvas(iframeBody, {
+                            width: 960,
+                            height: 540,
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: null,
+                            logging: false,
+                            windowWidth: 960,
+                            windowHeight: 540
+                        });
+
+                        cleanup();
+
+                        // Return as PNG data URL
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch (e) {
+                        console.warn('html2canvas failed, trying fallback:', e);
+                        cleanup();
+                        // Fallback: try direct canvas approach
+                        resolve(await fallbackRender(slideHtml));
+                    }
+                }, 1500);
+            };
+
+            container.appendChild(iframe);
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(slideHtml);
+            doc.close();
+        });
+    }
+
+    async function fallbackRender(slideHtml) {
+        // Last resort: create a canvas with just the background color
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(slideHtml, 'text/html');
+        const body = doc.querySelector('body');
+        const style = doc.querySelector('style');
+
+        let bgColor = '#1a1a2e';
+        if (style) {
+            const bgMatch = style.textContent.match(/background(?:-color)?\s*:\s*([^;}\n]+)/);
+            if (bgMatch) {
+                const val = bgMatch[1].trim();
+                if (val.startsWith('#')) bgColor = val;
+                else if (val.startsWith('linear-gradient')) {
+                    const cm = val.match(/#([0-9a-fA-F]{3,8})/);
+                    if (cm) bgColor = '#' + cm[1];
+                }
+            }
+        }
+        if (body) {
+            const bbg = body.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;}"']+)/);
+            if (bbg) bgColor = bbg[1].trim();
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 1920;
+        canvas.height = 1080;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, 1920, 1080);
+
+        // Extract and draw text
+        const headings = doc.querySelectorAll('h1, h2, h3');
+        const pars = doc.querySelectorAll('p, li');
+        let y = 80;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#ffffff';
+
+        headings.forEach(h => {
+            const sz = h.tagName === 'H1' ? 48 : h.tagName === 'H2' ? 36 : 28;
+            ctx.font = `bold ${sz}px "Segoe UI", sans-serif`;
+            const color = h.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/);
+            if (color) ctx.fillStyle = color[1].trim();
+            ctx.fillText(h.textContent.trim(), 80, y);
+            y += sz + 10;
+        });
+
+        ctx.font = '18px "Segoe UI", sans-serif';
+        pars.forEach(p => {
+            if (y > 1040) return;
+            const text = p.textContent.trim();
+            if (text.length > 100) {
+                // Word wrap
+                const words = text.split(' ');
+                let line = '';
+                for (const word of words) {
+                    if ((line + ' ' + word).length > 100) {
+                        ctx.fillText(line, 80, y);
+                        y += 24;
+                        line = word;
+                    } else {
+                        line = line ? line + ' ' + word : word;
+                    }
+                }
+                if (line) ctx.fillText(line, 80, y);
+            } else {
+                ctx.fillText(text, 80, y);
+            }
+            y += 24;
+        });
+
+        return canvas.toDataURL('image/png');
+    }
 
     function loadScript(src) {
         return new Promise((resolve, reject) => {

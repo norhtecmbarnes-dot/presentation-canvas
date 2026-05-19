@@ -949,7 +949,11 @@ GOVERNMENT BID MODE (auto-detect)
 Activate this mode automatically when the user mentions any of: "gov bid", "government proposal", "compact bid", "quad chart", "limited slides", "proposal", or any government/defense/military bidding context.
 
 When GOVERNMENT BID MODE is active:
-- Maximum 5-6 slides total unless the user explicitly requests more.
+- SLIDE COUNT IS USER-SETTABLE. Default maximum is 5 slides.
+- If the user has NOT already specified a slide count in their request, you MUST ask FIRST before generating:
+  "How many slides/pages are allowed for this government bid deck? (default is 5)"
+- If the user HAS already specified a number (e.g. "8 slides", "max 4 pages", "no more than 10"), use that number and do NOT ask again.
+- Always respect the user-provided or default maximum. Do not exceed it.
 - Extreme conciseness: maximum 4 short bullets per slide, large readable fonts, heavy visuals/icons, minimal text.
 - Dense but scannable: perfect for government reviewers who hate wordy decks.
 - Override theme to government-contractor style unless user specifies otherwise:
@@ -1067,7 +1071,57 @@ body { display:flex; flex-direction:column; width:960px; height:540px; font-fami
 table { width:100%; border-collapse:collapse; font-size:13px; }
 th { background:var(--accent); color:#fff; padding:6px 10px; text-align:left; }
 td { padding:5px 10px; border-bottom:1px solid var(--border); }
-.total { font-size:22px; font-weight:bold; color:var(--accent); text-align:right; padding:8px 20px; }`;
+.total { font-size:22px; font-weight:bold; color:var(--accent); text-align:right; padding:8px 20px; }
+
+═══════════════════════════════════════════
+PPTX EXPORT MODE (auto-detect)
+═══════════════════════════════════════════
+Activate this mode automatically when the user mentions ANY of: "pptx", "powerpoint", "convert to pptx", "export to pptx", "ppt", "not converting well", or "pptx friendly".
+Also activate when the user says "PPTX_EXPORT_MODE".
+Also activate whenever the user indicates they will export to PowerPoint or need PPTX-compatible slides, UNLESS they specifically say "keep beautiful HTML only".
+
+When PPTX EXPORT MODE is active, apply these OVERRIDES to all slide generation:
+
+1. LAYOUT: Use ONLY absolute positioning (position:absolute with top/left/width/height in pixels). NO flexbox, NO CSS Grid, NO display:flex, NO display:grid.
+2. BODY: Exactly width:960px; height:540px; position:relative; overflow:hidden;
+3. FONTS: Use ONLY Arial, Calibri, or 'Segoe UI'. No other font families.
+4. ELEMENTS: Use only basic <div>, <table>, <tr>, <td>, <h1>-<h6>, <p>, <ul>, <li>, <span>, <b>, <i>, <hr>, and inline <svg>. No <section>, <article>, <figure>, <figcaption>, or other semantic elements.
+5. COLORS: Keep colors simple — solid fills only. NO linear-gradient, NO radial-gradient, NO background-blend-mode. Use the theme CSS variables or simple hex colors.
+6. SVG: All charts (Gantt, RACI, Costing, Quad) must still render but use SIMPLER SVG code — basic <rect>, <line>, <text>, <circle>, <path> elements only. No SVG filters, no clip-path, no mask.
+7. INVISIBLE MARKER: Add this exact comment at the very top of EVERY <style> tag:
+/* PPTX_EXPORT_FRIENDLY: absolute layout, simple elements, no flex/grid */
+8. SLIDE FOOTER: Add a small footer div on every slide (except title slide) with slide number and presentation title, absolutely positioned at bottom.
+9. When PPTX_EXPORT MODE + GOVERNMENT BID MODE are both active:
+   - Still enforce the user-settable slide maximum (default 5)
+   - Use the government palette (--bg:#0a2342; --text:#ffffff; --accent:#00b4d8)
+   - Every slide must have the corporate-sensitive footer
+   - All charts must use the simple SVG approach above
+
+PPTX_EXPORT FRIENDLY TEMPLATE (use when this mode is active):
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+/* PPTX_EXPORT_FRIENDLY: absolute layout, simple elements, no flex/grid */
+* { margin:0; padding:0; box-sizing:border-box; }
+body { width:960px; height:540px; position:relative; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); }
+.title { position:absolute; top:30px; left:40px; width:880px; font-size:36px; font-weight:bold; color:var(--h1); }
+.content { position:absolute; top:100px; left:40px; width:880px; height:380px; }
+.footer { position:absolute; bottom:8px; right:20px; font-size:10px; color:var(--text); opacity:0.5; }
+</style>
+</head>
+<body>
+<div class="title">Slide Title Here</div>
+<div class="content">
+  <p style="font-size:20px; margin-bottom:12px;">Content goes here</p>
+  <ul style="font-size:16px; line-height:1.8;">
+    <li>Bullet point one</li>
+    <li>Bullet point two</li>
+  </ul>
+</div>
+<div class="footer">Slide 2 | Presentation Title</div>
+</body>
+</html>`;
 
         if (mode === 'script') {
             return basePrompt + `
