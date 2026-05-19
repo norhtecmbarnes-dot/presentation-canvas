@@ -209,8 +209,23 @@ body { background: #333; }
         return new Promise((resolve, reject) => {
             const bgColor = extractBgColor(slideHtml);
 
-            // Inject explicit dimensions into the slide HTML so body fills exactly 960x540
-            let sizedHtml = slideHtml.replace('</head>', '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style></head>');
+            // Fix the slide HTML: replace gradients with solid bg, inject dimensions
+            let sizedHtml = slideHtml
+                // Replace linear-gradient backgrounds with solid color (first color in gradient)
+                .replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
+                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
+                    return match;
+                })
+                // Also replace background-image gradients
+                .replace(/background-image\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
+                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
+                    return match;
+                });
+
+            // Inject explicit dimensions into the slide HTML
+            sizedHtml = sizedHtml.replace('</head>', '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style></head>');
             if (!sizedHtml.includes('</head>')) {
                 sizedHtml = '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style>' + sizedHtml;
             }
@@ -222,7 +237,6 @@ body { background: #333; }
             iframe.onload = () => {
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
 
-                // Give the browser time to fully apply CSS and layout
                 setTimeout(async () => {
                     try {
                         if (typeof html2canvas !== 'undefined') {
@@ -234,7 +248,7 @@ body { background: #333; }
                                 useCORS: true,
                                 allowTaint: true,
                                 logging: false,
-                                foreignObjectRendering: true,
+                                foreignObjectRendering: false,
                                 scrollX: 0,
                                 scrollY: 0,
                                 windowWidth: 960,
