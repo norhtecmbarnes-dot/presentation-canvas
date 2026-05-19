@@ -120,7 +120,7 @@ p { font-size: 24px; color: #a0a0b0; }
         currentMode: 'generate',
         currentSessionId: null,
         sessions: [],
-        sidebarOpen: false,
+        sidebarOpen: true,
         settings: {
             ollamaUrl: 'http://localhost:11434',
             openaiKey: '',
@@ -1285,6 +1285,13 @@ body { background: #111; overflow: hidden; }
             createSession(newTitle);
         }
 
+        // Clear any default slide so generated slides replace it
+        if (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML) {
+            state.slides = [];
+            state.currentSlideIndex = 0;
+            renderAll();
+        }
+
         addChatMessage('user', prompt);
         input.value = '';
 
@@ -1325,7 +1332,17 @@ body { background: #111; overflow: hidden; }
 
         try {
             const mode = document.getElementById('gen-mode-select').value;
-            const systemPrompt = getSlideSystemPrompt(mode) + getImageContext();
+            let systemPrompt = getSlideSystemPrompt(mode) + getImageContext();
+
+            const maxSlides = document.getElementById('max-slides-input').value;
+            if (maxSlides && parseInt(maxSlides) > 0) {
+                systemPrompt += `\n\nUSER-SPECIFIED MAXIMUM: Generate exactly ${parseInt(maxSlides)} slides. Do not exceed this number.`;
+            }
+
+            const footerLabel = document.getElementById('footer-label-input').value.trim();
+            if (footerLabel) {
+                systemPrompt += `\n\nFOOTER LABEL: Every slide (except title slides) must include a footer with the text "${footerLabel}" in small font, typically at the bottom-right or bottom-center. This label should be subtle but legible (e.g. font-size:10px, opacity:0.6, color matching the text). For government/military presentations, common labels include: CUI (Controlled Unclassified Information), Company Sensitive, Do Not Distribute, For Official Use Only, etc.`;
+            }
 
             const response = await sendToLLM(prompt, systemPrompt);
 
