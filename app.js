@@ -135,7 +135,8 @@ p { font-size: 24px; color: #a0a0b0; }
         currentProvider: 'ollama',
         currentModel: '',
         currentView: 'preview',
-        currentTheme: 'dark'
+        currentTheme: 'dark',
+        useLargePrompt: true
     };
 
     function loadSettings() {
@@ -894,16 +895,24 @@ p { font-size: 24px; color: #a0a0b0; }
     function getImageContext() {
         let context = '';
         if (state.uploadedImages.length > 0) {
-            context += '\n\nThe user has uploaded the following images that can be embedded in slides:\n';
-            state.uploadedImages.forEach((img, i) => {
-                context += `- Image ${i + 1}: "${img.name}" (${img.width}x${img.height}) — src="${img.data.substring(0, 80)}..."\n`;
+            context += '\n\nImages available for embedding:';
+            var maxChars = isSmallModel() ? 30 : 80;
+            state.uploadedImages.forEach(function(img, i) {
+                context += '\n- Image ' + (i + 1) + ': "' + img.name + '" (' + img.width + 'x' + img.height + ') - src="' + img.data.substring(0, maxChars) + '..."';
             });
-            context += 'To embed an image, use <img src="FULL_BASE64_DATA" style="max-width:80%;max-height:60vh;display:block;margin:20px auto;border-radius:8px;">. You MUST include the complete base64 data URI from above.\n';
+            context += '\nTo embed: <img src="FULL_BASE64_DATA" style="max-width:80%;max-height:60vh;display:block;margin:20px auto;border-radius:8px;">';
         }
         if (state.logo) {
-            context += '\n\nA logo has been uploaded for this presentation. It will be automatically added to all slides, so do NOT include it in your slide HTML.\n';
+            context += '\n\nA logo is uploaded - it will be added to all slides automatically. Do NOT include it in slide HTML.';
         }
         return context;
+    }
+
+    function isSmallModel() {
+        var m = (state.currentModel || '').toLowerCase();
+        if (/3b|4b|tiny|small|mini|nano|1b|2b|3\\.2b|3\\.1b|3-4b/.test(m)) return true;
+        if (/gemma2|gemma-2|qwen2\\.5:3|phi|smollm|stablelm/.test(m)) return true;
+        return false;
     }
 
     function getSlideSystemPrompt(mode) {
@@ -1184,17 +1193,63 @@ CONTENT RULES:
 - Small footer on every content slide: "Slide N | Title" at bottom-right.
 - Use meaningful content, never lorem ipsum.`;
 
+        var result;
         if (mode === 'script') {
-            return basePrompt + '\n\nMODE: SCRIPT\nFirst output a numbered outline (1. Title, 2. Title...), then output all <<<SLIDE>>> blocks.';
+            result = basePrompt + '\n\nMODE: SCRIPT\nFirst output a numbered outline (1. Title, 2. Title...), then output all <<<SLIDE>>> blocks.';
         } else if (mode === 'markdown') {
-            return basePrompt + '\n\nMODE: MARKDOWN\nFirst output the deck with ---SLIDE--- separators in markdown, then output all <<<SLIDE>>> blocks.';
+            result = basePrompt + '\n\nMODE: MARKDOWN\nFirst output the deck with ---SLIDE--- separators in markdown, then output all <<<SLIDE>>> blocks.';
         } else {
-            return basePrompt + '\n\nMODE: SLIDES\nGenerate slide HTML blocks directly. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks.';
+            result = basePrompt + '\n\nMODE: SLIDES\nGenerate slide HTML blocks directly. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks.';
         }
+
+        if (isSmallModel()) {
+            result = getCompactPrompt(mode, t, govBg, govAccent);
+        }
+
+        return result;
+    }
+
+    function getCompactPrompt(mode, t, govBg, govAccent) {
+        var bg = t.background, c = t.color, ac = t.accent, h1c = t.h1Color;
+        var exampleSlide = '<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}body{display:flex;align-items:center;justify-content:center;width:960px;height:540px;font-family:\'Segoe UI\',sans-serif;background:'+bg+';color:'+c+';overflow:hidden;}h1{font-size:48px;color:'+h1c+';}p{font-size:20px;}</style></head><body><div style="text-align:center;padding:40px;"><h1>Slide Title</h1><p>Your content here</p></div></body></html>';
+        var gov = '';
+
+        if (/gov bid|proposal|compact bid|RFP|quad chart|government/.test(state.chatHistory.slice(-1)[0]?.content || '')) {
+            gov = '\n\nGOV MODE: Use background='+govBg+' text=#ffffff. Max 5 slides unless told otherwise.';
+        }
+
+        var prompt = 'Create HTML slides. Each slide = 960x540px. Wrap each in <<<SLIDE>>>...<<<END_SLIDE>>>.\n\n' +
+            'CRITICAL RULES:\n' +
+            '1. body { width:960px;height:540px;overflow:hidden; }\n' +
+            '2. All CSS in one <style> tag. No external files. No JS.\n' +
+            '3. Output ONLY markers and HTML. No extra text.\n' +
+            '4. Use ONLY solid background colors. No gradients.\n' +
+            '5. Each slide under 3000 characters.\n\n' +
+            'Colors to use: background='+bg+' text='+c+' accent='+ac+'\n\n' +
+            'EXAMPLE (copy this pattern):\n'+
+            exampleSlide + '\n\n' +
+            gov;
+
+        if (mode === 'script') prompt += '\n\nFirst list slide titles (1,2,3...), then output <<<SLIDE>>> blocks.';
+        else if (mode === 'markdown') prompt += '\n\nFirst output a markdown outline with ---SLIDE--- separators, then <<<SLIDE>>> blocks.';
+        else prompt += '\n\nOutput <<<SLIDE>>>...<<<END_SLIDE>>> blocks directly.';
+
+        return prompt;
     }
 
     function getEditSystemPrompt() {
         const t = SLIDE_THEMES[state.currentTheme];
+        if (isSmallModel()) {
+            return 'You are editing a slide. Return the COMPLETE modified HTML.\n\n' +
+                'RULES:\n' +
+                '1. <!DOCTYPE html>...<style>...</style><body>...</body></html>\n' +
+                '2. 960x540px. Single <style> tag. No JS.\n' +
+                '3. Colors: bg=' + t.background + ' text=' + t.color + ' accent=' + t.accent + '\n' +
+                '4. Wrap in <<<SLIDE>>>...<<<END_SLIDE>>>.\n' +
+                '5. Only the changes requested. Keep everything else.\n' +
+                '6. Under 3000 chars.\n' +
+                '7. If a chart or SVG is too complex, use a simple table or list instead.';
+        }
         return 'You are editing a presentation slide. The user wants a specific change.\n\n' +
             'RULES:\n' +
             '1. Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head> with <style>, and <body>.\n' +

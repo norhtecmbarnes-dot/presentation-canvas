@@ -84,10 +84,12 @@ Government bids demand specific formats — quad charts, RACI matrices, Gantt ti
 ### 2. Pull a Model (Ollama)
 
 ```bash
-ollama pull llama3      # General purpose
+ollama pull llama3      # General purpose (recommended — fast, capable)
 ollama pull mistral     # Fast, capable
 ollama pull glm4        # Excellent for structured output
 ```
+
+> **Small models** (tiny, phi, gemma2:2b, 3B-4B models) will work but get a simplified prompt to fit within their context window. They can produce clean text slides but will rarely produce complex SVG charts (Gantt, pie, etc.). For charts and rich formatting, use 7B+ models.
 
 ### 3. Launch
 
