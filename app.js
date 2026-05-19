@@ -1492,7 +1492,57 @@ body { background: #111; overflow: hidden; }
     }
 
     function applyThemeToSlide(slideHtml, theme) {
-        return slideHtml;
+        const t = SLIDE_THEMES[theme];
+        if (!t) return slideHtml;
+
+        let html = slideHtml;
+
+        const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+        if (!styleMatch) return html;
+
+        let css = styleMatch[1];
+
+        // Replace CSS variable definitions
+        css = css.replace(/--bg\s*:\s*[^;}]+/g, `--bg:${t.background}`);
+        css = css.replace(/--text\s*:\s*[^;}]+/g, `--text:${t.color}`);
+        css = css.replace(/--accent\s*:\s*[^;}]+/g, `--accent:${t.accent}`);
+        css = css.replace(/--h1\s*:\s*[^;}]+/g, `--h1:${t.h1Color}`);
+        css = css.replace(/--h2\s*:\s*[^;}]+/g, `--h2:${t.h2Color}`);
+        css = css.replace(/--(bg-secondary|border)\s*:\s*[^;}]+/g, (match, varName) => {
+            return `--${varName}:${t.background}`;
+        });
+
+        // Replace direct color values from the old theme
+        const allThemes = Object.values(SLIDE_THEMES);
+        for (const old of allThemes) {
+            if (old.background === t.background) continue;
+            // Background colors
+            css = css.replace(new RegExp(escapeRegex(old.background), 'g'), t.background);
+            css = css.replace(new RegExp(escapeRegex(old.color), 'g'), t.color);
+            css = css.replace(new RegExp(escapeRegex(old.accent), 'g'), t.accent);
+            html = html.replace(new RegExp(escapeRegex(old.background), 'g'), t.background);
+            html = html.replace(new RegExp(escapeRegex(old.color), 'g'), t.color);
+            html = html.replace(new RegExp(escapeRegex(old.accent), 'g'), t.accent);
+        }
+
+        // Also handle linear-gradient backgrounds that use theme colors
+        for (const old of allThemes) {
+            if (old.background === t.background) continue;
+            html = html.replace(new RegExp(`linear-gradient\\([^)]*${escapeRegex(old.background)}[^)]*\\)`, 'g'), t.background);
+        }
+
+        // Put the modified CSS back
+        html = html.replace(styleMatch[1], css);
+
+        // Also update inline styles on body
+        html = html.replace(/(<body[^>]*style="[^"]*?)background:\s*[^;"']+/g, `$1background:${t.background}`);
+        html = html.replace(/(<body[^>]*style="[^"]*?)color:\s*[^;"']+/g, `$1color:${t.color}`);
+
+        return html;
+    }
+
+    function escapeRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     function switchView(view) {
@@ -1752,7 +1802,11 @@ body { background: #111; overflow: hidden; }
         document.getElementById('move-slide-down-btn').addEventListener('click', () => moveSlide(state.currentSlideIndex, state.currentSlideIndex + 1));
 
         document.getElementById('theme-select').addEventListener('change', (e) => {
-            state.currentTheme = e.target.value;
+            const newTheme = e.target.value;
+            const oldTheme = state.currentTheme;
+            state.currentTheme = newTheme;
+            // Apply theme to all existing slides
+            state.slides = state.slides.map(html => applyThemeToSlide(html, newTheme));
             saveSlides();
             renderAll();
         });
