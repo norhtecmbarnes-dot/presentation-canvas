@@ -1,6 +1,14 @@
 (function () {
     'use strict';
 
+    const PPTX_THEMES = {
+        dark: { background: '1A1A2E', title: 'FFFFFF', text: 'E0E0E0', accent: '4FC3F7', h2: '4FC3F7' },
+        light: { background: 'FFFFFF', title: '111111', text: '222222', accent: '1976D2', h2: '1976D2' },
+        blue: { background: '0D47A1', title: 'FFFFFF', text: 'E3F2FD', accent: 'FFCA28', h2: 'FFCA28' },
+        green: { background: '1B5E20', title: 'FFFFFF', text: 'E8F5E9', accent: 'FFCA28', h2: 'A5D6A7' },
+        red: { background: 'B71C1C', title: 'FFFFFF', text: 'FFEbee', accent: 'FFCDD2', h2: 'FFCDD2' }
+    };
+
     function parseSlideHtml(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
@@ -20,17 +28,17 @@
 
         function resolveColor(str) {
             if (!str) return null;
-            str = str.trim();
+            str = String(str).trim();
             const varRef = str.match(/var\(--([\w-]+)\)/);
-            if (varRef) {
-                const resolved = cssVars[varRef[1]];
-                if (resolved) str = resolved;
-            }
+            if (varRef && cssVars[varRef[1]]) str = cssVars[varRef[1]];
             return parseCssColor(str);
         }
 
         let bgColor = null;
         let textColor = null;
+        let accentColor = null;
+        let h1Color = null;
+        let h2Color = null;
 
         const bodyEl = doc.querySelector('body');
         if (bodyEl) {
@@ -40,9 +48,9 @@
             if (bs.color) textColor = resolveColor(bs.color);
         }
 
-        if (styleTag && !bgColor) {
+        if (styleTag) {
             const bgMatch = css.match(/body\s*\{[^}]*background(?:-color)?\s*:\s*([^;}]+)/);
-            if (bgMatch) {
+            if (bgMatch && !bgColor) {
                 let val = bgMatch[1].trim();
                 if (val.startsWith('linear-gradient')) {
                     const cm = val.match(/(?:to\s+\w+\s*,)?\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|[\w]+)/);
@@ -51,10 +59,13 @@
                     bgColor = resolveColor(val);
                 }
             }
-        }
-        if (styleTag && !textColor) {
             const colorMatch = css.match(/body\s*\{[^}]*\bcolor\s*:\s*([^;}]+)/);
-            if (colorMatch) textColor = resolveColor(colorMatch[1].trim());
+            if (colorMatch && !textColor) textColor = resolveColor(colorMatch[1].trim());
+            if (cssVars.bg) bgColor = bgColor || resolveColor(cssVars.bg);
+            if (cssVars.text) textColor = textColor || resolveColor(cssVars.text);
+            if (cssVars.accent) accentColor = resolveColor(cssVars.accent);
+            if (cssVars.h1) h1Color = resolveColor(cssVars.h1);
+            if (cssVars.h2) h2Color = resolveColor(cssVars.h2);
         }
 
         if (!bgColor) bgColor = 'FFFFFF';
@@ -64,49 +75,42 @@
         const title = headings.length > 0 ? headings[0].textContent.trim() : 'Slide';
 
         const texts = [];
+        const processedTexts = new Set();
+
         headings.forEach(h => {
-            const col = resolveColor(h.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || textColor;
-            texts.push({ type: 'title', text: h.textContent.trim(), fontSize: getComputedFontSize(h), bold: true, color: col });
-        });
-
-        const paragraphs = doc.querySelectorAll('p');
-        paragraphs.forEach(p => {
-            if (p.querySelector('h1,h2,h3,h4,h5,h6')) return;
-            const t = p.textContent.trim();
-            if (!t) return;
-            const col = resolveColor(p.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || textColor;
-            texts.push({ type: 'body', text: t, fontSize: getComputedFontSize(p), bold: false, color: col });
-        });
-
-        const listItems = doc.querySelectorAll('li');
-        listItems.forEach(li => {
-            const t = li.textContent.trim();
-            if (!t) return;
-            const col = resolveColor(li.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || getColorFromAncestors(li) || textColor;
-            texts.push({ type: 'bullet', text: t, fontSize: getComputedFontSize(li), bold: false, color: col });
-        });
-
-        const images = doc.querySelectorAll('img');
-        const imageData = [];
-        images.forEach(img => {
-            const src = img.getAttribute('src') || '';
-            if (src.startsWith('data:image')) {
-                imageData.push(src);
+            const t = h.textContent.trim();
+            if (t && !processedTexts.has(t)) {
+                processedTexts.add(t);
+                const col = resolveColor(h.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || h1Color || accentColor || textColor;
+                const sz = parseInt(h.getAttribute('style')?.match(/font-size\s*:\s*(\d+)/)?.[1]) || (h.tagName === 'H1' ? 44 : h.tagName === 'H2' ? 32 : 24);
+                texts.push({ type: 'title', text: t, fontSize: sz, bold: true, color: col });
             }
         });
 
-        return { title, texts: texts.filter(t => t.text.length > 0), bgColor, textColor, images: imageData };
-    }
+        doc.querySelectorAll('p').forEach(p => {
+            if (p.querySelector('h1,h2,h3,h4,h5,h6')) return;
+            const t = p.textContent.trim();
+            if (!t || processedTexts.has(t)) return;
+            processedTexts.add(t);
+            const col = resolveColor(p.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || textColor;
+            texts.push({ type: 'body', text: t, fontSize: 18, bold: false, color: col });
+        });
 
-    function getColorFromAncestors(el) {
-        let current = el.parentElement;
-        while (current && current.tagName !== 'BODY') {
-            const style = current.getAttribute('style') || '';
-            const m = style.match(/color\s*:\s*([^;}"']+)/);
-            if (m) return parseCssColor(m[1].trim());
-            current = current.parentElement;
-        }
-        return null;
+        doc.querySelectorAll('li').forEach(li => {
+            const t = li.textContent.trim();
+            if (!t || processedTexts.has(t)) return;
+            processedTexts.add(t);
+            const col = resolveColor(li.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || resolveColor(li.parentElement?.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/)?.[1]) || textColor;
+            texts.push({ type: 'bullet', text: t, fontSize: 16, bold: false, color: col });
+        });
+
+        const images = [];
+        doc.querySelectorAll('img').forEach(img => {
+            const src = img.getAttribute('src') || '';
+            if (src.startsWith('data:image')) images.push(src);
+        });
+
+        return { title, texts, bgColor, textColor, accentColor, h1Color: h1Color || accentColor, h2Color: h2Color || accentColor, images };
     }
 
     function parseCssColor(str) {
@@ -126,26 +130,8 @@
             const b = parseInt(rgbMatch[3]).toString(16).padStart(2, '0');
             return (r + g + b).toUpperCase();
         }
-        const namedColors = {
-            white: 'FFFFFF', black: '000000', red: 'FF0000', green: '008000',
-            blue: '0000FF', navy: '000080', gray: '808080', grey: '808080',
-            yellow: 'FFFF00', orange: 'FFA500', purple: '800080', cyan: '00FFFF',
-            transparent: null
-        };
-        if (namedColors[str.toLowerCase()] !== undefined) return namedColors[str.toLowerCase()];
-        return null;
-    }
-
-    function getComputedFontSize(el) {
-        const style = el.getAttribute('style') || '';
-        const m = style.match(/font-size\s*:\s*(\d+)/);
-        if (m) return parseInt(m[1]);
-        const tag = el.tagName.toLowerCase();
-        if (tag === 'h1') return 44;
-        if (tag === 'h2') return 32;
-        if (tag === 'h3') return 24;
-        if (tag === 'li') return 18;
-        return 18;
+        const named = { white:'FFFFFF',black:'000000',red:'FF0000',green:'008000',blue:'0000FF',navy:'000080',gray:'808080',grey:'808080',yellow:'FFFF00',orange:'FFA500',purple:'800080',cyan:'00FFFF' };
+        return named[str.toLowerCase()] || null;
     }
 
     function isLightColor(hex) {
@@ -156,9 +142,9 @@
         return (r * 299 + g * 587 + b * 114) / 1000 > 128;
     }
 
-    function hexToRgb(hex) {
-        if (!hex) return 'FFFFFF';
-        return hex;
+    function getC(hex) {
+        if (!hex || hex.length < 6) return '000000';
+        return hex.substring(0, 6).toUpperCase();
     }
 
     window.exportToPDF = function (slides, title) {
@@ -166,6 +152,7 @@
 
         const printWindow = window.open('', '_blank');
         const escapedTitle = (title || 'Presentation').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
         let htmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -184,6 +171,7 @@ body { background: #333; }
     margin: 10px auto;
     box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     border-radius: 4px;
+    background: #000;
 }
 .slide-container iframe {
     width: 960px;
@@ -240,109 +228,116 @@ body { background: #333; }
         printWindow.document.close();
     };
 
-    window.exportToPPTX = function (slides, title) {
+    window.exportToPPTX = async function (slides, title) {
         if (!slides || slides.length === 0) { alert('No slides to export.'); return; }
 
-        if (typeof PptxGenJS === 'undefined') {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js';
-            script.onload = () => doPptxExport(slides, title);
-            script.onerror = () => {
-                alert('Failed to load PptxGenJS library. Opening HTML export instead.');
+        let PptxGenJS = window.PptxGenJS;
+        if (!PptxGenJS) {
+            try {
+                await loadScript('https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js');
+                PptxGenJS = window.PptxGenJS;
+            } catch (e) {
+                alert('Failed to load PptxGenJS. Opening HTML export instead.');
                 fallbackHtmlExport(slides, title);
-            };
-            document.head.appendChild(script);
-        } else {
-            doPptxExport(slides, title);
+                return;
+            }
         }
-    };
 
-    function doPptxExport(slides, title) {
         try {
             const pptx = new PptxGenJS();
             pptx.layout = 'LAYOUT_WIDE';
             pptx.title = title || 'Presentation';
             pptx.author = 'Canvas';
-            pptx.subject = 'Generated by Canvas AI';
 
             const parsedSlides = slides.map(html => parseSlideHtml(html));
 
             parsedSlides.forEach((slide) => {
                 const pptSlide = pptx.addSlide();
+                pptSlide.background = { color: getC(slide.bgColor) };
 
-                if (slide.bgColor) {
-                    pptSlide.background = { color: hexToRgb(slide.bgColor) };
-                }
+                const hasDarkBg = !isLightColor(slide.bgColor);
+                const defaultTextColor = hasDarkBg ? 'FFFFFF' : '000000';
+                const defaultAccent = hasDarkBg ? (slide.accentColor || '4FC3F7') : (slide.accentColor || '1976D2');
 
-                const hasDarkBg = slide.bgColor && !isLightColor(slide.bgColor);
-
-                let yPos = 0.5;
+                let yPos = 0.4;
+                const leftMargin = 0.6;
+                const contentWidth = 12.13;
 
                 const titleTexts = slide.texts.filter(t => t.type === 'title');
                 if (titleTexts.length > 0) {
-                    const titleSize = Math.min(titleTexts[0].fontSize, 44);
-                    const titleColor = titleTexts[0].color || (hasDarkBg ? 'FFFFFF' : '000000');
+                    const titleSize = Math.min(titleTexts[0].fontSize || 44, 44);
+                    const titleColor = getC(titleTexts[0].color) || getC(slide.h1Color) || getC(slide.accentColor) || defaultAccent;
 
-                    const titleStr = titleTexts.map(t => t.text).join('\n');
-                    pptSlide.addText(titleStr, {
-                        x: 0.5,
+                    pptSlide.addText(titleTexts.map(t => ({
+                        text: t.text,
+                        options: { fontSize: Math.min(t.fontSize || 44, 44), bold: true, color: getC(t.color) || titleColor, fontFace: 'Calibri Light', breakType: 'none' }
+                    })), {
+                        x: leftMargin,
                         y: yPos,
-                        w: '90%',
-                        h: titleSize * 0.03,
-                        fontSize: titleSize,
-                        bold: true,
-                        color: hexToRgb(titleColor),
-                        fontFace: 'Calibri Light',
+                        w: contentWidth,
+                        h: titleSize * 0.028,
                         valign: 'bottom'
                     });
-                    yPos += titleSize * 0.03 + 0.15;
+                    yPos += titleSize * 0.028 + 0.15;
                 }
 
                 const bodyTexts = slide.texts.filter(t => t.type !== 'title');
                 if (bodyTexts.length > 0) {
-                    const bodyColor = bodyTexts[0].color || (hasDarkBg ? 'FFFFFF' : '000000');
+                    const textColor = getC(bodyTexts[0].color) || defaultTextColor;
+                    const bodyHeight = 7.5 - yPos - 0.4;
+                    if (bodyHeight > 0) {
+                        const textRows = bodyTexts.map(t => {
+                            const sz = Math.min(t.fontSize || 18, 24);
+                            return {
+                                text: t.text,
+                                options: {
+                                    fontSize: sz,
+                                    color: getC(t.color) || textColor,
+                                    bullet: t.type === 'bullet',
+                                    bold: t.bold || t.type === 'title',
+                                    fontFace: 'Calibri',
+                                    paraSpaceAfter: 4
+                                }
+                            };
+                        });
 
-                    const textRows = bodyTexts.map(t => {
-                        const sz = Math.min(t.fontSize || 18, 24);
-                        return {
-                            text: t.text,
-                            options: {
-                                fontSize: sz,
-                                color: hexToRgb(t.color || bodyColor),
-                                bullet: t.type === 'bullet',
-                                bold: t.type === 'title',
-                                fontFace: 'Calibri'
-                            }
-                        };
-                    });
-
-                    const remainingHeight = 7.5 - yPos - 0.3;
-                    pptSlide.addText(textRows, {
-                        x: 0.5,
-                        y: yPos,
-                        w: '90%',
-                        h: remainingHeight > 0 ? remainingHeight : 3,
-                        valign: 'top',
-                        fontFace: 'Calibri'
-                    });
+                        pptSlide.addText(textRows, {
+                            x: leftMargin,
+                            y: yPos,
+                            w: contentWidth,
+                            h: bodyHeight > 0 ? bodyHeight : 3,
+                            valign: 'top',
+                            fontFace: 'Calibri'
+                        });
+                    }
                 }
 
                 slide.images.forEach(imgSrc => {
                     try {
-                        pptSlide.addImage({ data: imgSrc, x: 1.5, y: 1.5, w: 4, h: 3 });
+                        pptSlide.addImage({ data: imgSrc, x: 1.5, y: 1.5, w: 4, h: 3, sizing: { type: 'contain', w: 4, h: 3 } });
                     } catch (e) {
                         console.warn('Could not add image to slide:', e);
                     }
                 });
             });
 
-            pptx.writeFile({ fileName: `${(title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_')}.pptx` });
+            await pptx.writeFile({ fileName: `${(title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_')}.pptx` });
 
         } catch (e) {
             console.error('PptxGenJS error:', e);
             alert('Error creating PPTX: ' + e.message + '\n\nOpening HTML export instead.');
             fallbackHtmlExport(slides, title);
         }
+    };
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     }
 
     function fallbackHtmlExport(slides, title) {
