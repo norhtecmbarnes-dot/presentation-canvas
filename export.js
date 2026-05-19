@@ -93,30 +93,25 @@ body { background: #333; }
         document.body.appendChild(overlay);
         const progress = overlay.querySelector('#pptx-progress');
 
-        // Load rendering libraries: html-to-image (primary), html2canvas (fallback)
-        let useHtmlToImage = false;
-        if (typeof htmlToImage === 'undefined') {
-            try {
-                await loadScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js');
-                useHtmlToImage = true;
-            } catch (e) {
-                console.warn('html-to-image failed to load, trying html2canvas');
-            }
-        } else {
-            useHtmlToImage = true;
-        }
-
-        if (!useHtmlToImage && typeof html2canvas === 'undefined') {
+        // Load rendering libraries: html2canvas (primary), html-to-image (fallback)
+        if (typeof html2canvas === 'undefined') {
             try {
                 await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-            } catch (e2) {
+            } catch (e) {
                 try {
                     await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
-                } catch (e3) {
-                    overlay.remove();
-                    alert('Failed to load rendering libraries. Opening HTML export instead.');
-                    fallbackHtmlExport(slides, title);
-                    return;
+                } catch (e2) {
+                    // Try html-to-image as fallback
+                    if (typeof htmlToImage === 'undefined') {
+                        try {
+                            await loadScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js');
+                        } catch (e3) {
+                            overlay.remove();
+                            alert('Failed to load rendering libraries. Opening HTML export instead.');
+                            fallbackHtmlExport(slides, title);
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -187,57 +182,64 @@ body { background: #333; }
     };
 
     function renderSlideToPng(slideHtml) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const iframe = document.createElement('iframe');
-            // Visible but behind progress overlay (z-index:9999) — browser must paint it
-            iframe.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px;border:none;z-index:9998;background:white;';
-            document.body.appendChild(iframe);
+            // Offscreen but not display:none — browser must paint it
+            iframe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:960px;height:540px;border:none;';
 
-            // Use onload event then wait 500ms for full paint
             iframe.onload = () => {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+                // Give the browser time to fully apply CSS and layout
                 setTimeout(async () => {
-                        try {
-                            if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
-                                const dataUrl = await htmlToImage.toPng(iframe.contentDocument.body, {
-                                    width: 960,
-                                    height: 540,
-                                    pixelRatio: 2,
-                                    backgroundColor: null
-                                });
-                                iframe.remove();
-                                resolve(dataUrl);
-                                return;
-                            }
-                            if (typeof html2canvas !== 'undefined') {
-                                const canvas = await html2canvas(iframe.contentDocument.body, {
-                                    width: 960,
-                                    height: 540,
-                                    scale: 2,
-                                    backgroundColor: null,
-                                    useCORS: false,
-                                    allowTaint: true,
-                                    logging: false,
-                                    foreignObjectRendering: true,
-                                    scrollX: 0,
-                                    scrollY: 0,
-                                    windowWidth: 960,
-                                    windowHeight: 540
-                                });
-                                iframe.remove();
-                                resolve(canvas.toDataURL('image/png'));
-                                return;
-                            }
-                            iframe.remove();
-                            resolve(await divRenderFallback(slideHtml));
-                        } catch (e) {
-                            console.warn('iframe render failed, trying div fallback:', e);
-                            try { iframe.remove(); } catch(ex) {}
+                    try {
+                        if (typeof html2canvas !== 'undefined') {
+                            const canvas = await html2canvas(iframeDoc.body, {
+                                width: 960,
+                                height: 540,
+                                scale: 2,
+                                backgroundColor: null,
+                                useCORS: true,
+                                allowTaint: true,
+                                logging: false,
+                                foreignObjectRendering: true,
+                                scrollX: 0,
+                                scrollY: 0,
+                                windowWidth: 960,
+                                windowHeight: 540
+                            });
+                            document.body.removeChild(iframe);
+                            resolve(canvas.toDataURL('image/png'));
+                        } else if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
+                            const dataUrl = await htmlToImage.toPng(iframeDoc.body, {
+                                width: 960,
+                                height: 540,
+                                pixelRatio: 2,
+                                backgroundColor: null
+                            });
+                            document.body.removeChild(iframe);
+                            resolve(dataUrl);
+                        } else {
+                            document.body.removeChild(iframe);
                             resolve(await divRenderFallback(slideHtml));
                         }
-                    }, 500);
+                    } catch (e) {
+                        console.error('html2canvas rendering failed:', e);
+                        try { document.body.removeChild(iframe); } catch(ex) {}
+                        resolve(await divRenderFallback(slideHtml));
+                    }
+                }, 500);
             };
 
-            const doc = iframe.contentDocument;
+            iframe.onerror = (err) => {
+                console.error('Iframe loading error:', err);
+                try { document.body.removeChild(iframe); } catch(ex) {}
+                divRenderFallback(slideHtml).then(resolve);
+            };
+
+            // Write content AFTER setting onload so we catch the load event
+            document.body.appendChild(iframe);
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
             doc.open();
             doc.write(slideHtml);
             doc.close();
