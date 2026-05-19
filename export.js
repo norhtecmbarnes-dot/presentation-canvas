@@ -181,8 +181,40 @@ body { background: #333; }
         overlay.remove();
     };
 
+    function extractBgColor(slideHtml) {
+        let bg = '#1a1a2e';
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(slideHtml, 'text/html');
+            const style = doc.querySelector('style');
+            if (style) {
+                const css = style.textContent;
+                const m = css.match(/--bg\s*:\s*([^;}\n]+)/);
+                if (m) bg = m[1].trim();
+                const m2 = css.match(/body\s*\{[^}]*background(?:-color)?\s*:\s*([^;}\n]+)/);
+                if (m2) bg = m2[1].trim();
+                const m3 = css.match(/background\s*:\s*linear-gradient\([^,]+,\s*([^,\s)]+)/);
+                if (m3) bg = m3[1].trim();
+            }
+            const body = doc.querySelector('body');
+            if (body) {
+                const m = body.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;}"']+)/);
+                if (m) bg = m[1].trim();
+            }
+        } catch (e) { /* keep default */ }
+        return bg;
+    }
+
     function renderSlideToPng(slideHtml) {
         return new Promise((resolve, reject) => {
+            const bgColor = extractBgColor(slideHtml);
+
+            // Inject explicit dimensions into the slide HTML so body fills exactly 960x540
+            let sizedHtml = slideHtml.replace('</head>', '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style></head>');
+            if (!sizedHtml.includes('</head>')) {
+                sizedHtml = '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style>' + sizedHtml;
+            }
+
             const iframe = document.createElement('iframe');
             // Offscreen but not display:none — browser must paint it
             iframe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:960px;height:540px;border:none;';
@@ -198,7 +230,7 @@ body { background: #333; }
                                 width: 960,
                                 height: 540,
                                 scale: 2,
-                                backgroundColor: null,
+                                backgroundColor: bgColor,
                                 useCORS: true,
                                 allowTaint: true,
                                 logging: false,
@@ -215,7 +247,7 @@ body { background: #333; }
                                 width: 960,
                                 height: 540,
                                 pixelRatio: 2,
-                                backgroundColor: null
+                                backgroundColor: bgColor
                             });
                             document.body.removeChild(iframe);
                             resolve(dataUrl);
@@ -241,7 +273,7 @@ body { background: #333; }
             document.body.appendChild(iframe);
             const doc = iframe.contentDocument || iframe.contentWindow.document;
             doc.open();
-            doc.write(slideHtml);
+            doc.write(sizedHtml);
             doc.close();
         });
     }
