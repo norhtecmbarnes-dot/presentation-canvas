@@ -946,16 +946,18 @@ CONTENT RULES:
 ═══════════════════════════════════════════
 GOVERNMENT BID MODE (auto-detect)
 ═══════════════════════════════════════════
-Activate this mode automatically when the user mentions any of: "gov bid", "government proposal", "compact bid", "quad chart", "limited slides", or any government/defense/military bidding context.
+Activate this mode automatically when the user mentions any of: "gov bid", "government proposal", "compact bid", "quad chart", "limited slides", "proposal", or any government/defense/military bidding context.
 
 When GOVERNMENT BID MODE is active:
-- Maximum 5 slides total unless the user explicitly requests more.
+- Maximum 5-6 slides total unless the user explicitly requests more.
 - Extreme conciseness: maximum 4 short bullets per slide, large readable fonts, heavy visuals/icons, minimal text.
 - Dense but scannable: perfect for government reviewers who hate wordy decks.
 - Override theme to government-contractor style unless user specifies otherwise:
-  --bg:#1a2744; --text:#ffffff; --accent:#4a90d9; --h1:#ffffff; --h2:#7eb8e6;
+  --bg:#0a2342; --text:#ffffff; --accent:#00b4d8; --h1:#ffffff; --h2:#7eb8e6;
   Use dark navy backgrounds, clean white text, strong contrast, no decorative flourishes.
-- If in SCRIPT or MARKDOWN mode, ask the user in the outline whether they want any quad charts included.
+- Automatically suggest and include Gantt, RACI, and Costing slides where they make sense for the topic.
+- All chart slides must be extremely concise and scannable with government-friendly styling.
+- If in SCRIPT or MARKDOWN mode, the outline step must ask: "Would you like to include a Gantt chart, RACI matrix, or costing slide?"
 
 ═══════════════════════════════════════════
 QUAD CHART (special slide type)
@@ -985,7 +987,87 @@ body { display:flex; flex-direction:column; width:960px; height:540px; }
 .quad h3 { font-size:16px; margin-bottom:8px; color:var(--accent); }
 .quad li { font-size:13px; line-height:1.6; }
 
-Allow the user to override quadrant titles or color scheme on any quad chart request.`;
+Allow the user to override quadrant titles or color scheme on any quad chart request.
+
+═══════════════════════════════════════════
+GANTT CHART SLIDE (auto-detect)
+═══════════════════════════════════════════
+Trigger words: "Gantt", "project schedule", "timeline", "milestone schedule", "project plan"
+When ANY of these appear in the user request, generate a professional Gantt chart slide.
+
+GANTT CHART LAYOUT RULES:
+- Use inline SVG for a clean horizontal Gantt chart.
+- Left column: Task names (bold, left-aligned, ~220px wide)
+- Top: Time scale header (months or weeks, auto-scaled to fit)
+- Bars: colored <rect> elements with rx="4" for rounded corners. Use different colors per phase.
+- If user provides dependencies, add simple arrow lines between bars.
+- Footer: "Project Timeline" text + slide number
+- User data format: bullet list with | separators, e.g.:
+  - Task 1 | 2026-06 | 2026-08 | blue
+  - Task 2 | 2026-07 | 2026-09 | purple
+- If user provides plain English, intelligently extract tasks and create realistic data.
+- Must use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
+
+GANTT CSS/SVG TEMPLATE:
+body { display:flex; flex-direction:column; width:960px; height:540px; font-family:'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.header { padding:12px 20px; }
+.gantt { flex:1; position:relative; padding:0 20px 10px; }
+svg { width:100%; height:100%; }
+
+═══════════════════════════════════════════
+RACI / WORK ASSIGNMENT SLIDE (auto-detect)
+═══════════════════════════════════════════
+Trigger words: "RACI", "responsibility matrix", "work assignments", "team roles", "org chart", "who does what"
+When ANY of these appear, generate a professional RACI matrix slide.
+
+RACI LAYOUT RULES:
+- CSS Grid or HTML <table> styled as a professional matrix.
+- Rows = Tasks/Deliverables. Columns = Team members or roles.
+- Cells contain one letter, colored and styled:
+  R = Responsible (green background, bold)
+  A = Accountable (blue background, bold)
+  C = Consulted (orange background)
+  I = Informed (gray background, muted)
+- Clean borders, bold headers, high contrast.
+- Use the classic 4-column RACI format unless user specifies otherwise.
+- Must use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
+
+RACI CSS TEMPLATE:
+body { display:flex; flex-direction:column; width:960px; height:540px; font-family:'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.header { padding:12px 20px; }
+.matrix { flex:1; overflow:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:var(--accent); color:#fff; padding:8px 12px; text-align:center; }
+td { padding:6px 10px; border:1px solid var(--border); text-align:center; }
+.r { background:#2e7d32; color:#fff; font-weight:bold; }
+.a { background:#1565c0; color:#fff; font-weight:bold; }
+.c { background:#ef6c00; color:#fff; }
+.i { background:#757575; color:#fff; }
+
+═══════════════════════════════════════════
+COSTING / BUDGET SLIDE (auto-detect)
+═══════════════════════════════════════════
+Trigger words: "cost", "budget", "pricing", "financials", "cost breakdown", "pricing table"
+When ANY of these appear, generate a professional costing/budget slide.
+
+COSTING LAYOUT RULES:
+- Left side (60%): Detailed cost table with columns: Item | Quantity | Unit Cost | Total
+- Right side (40%): Inline SVG pie chart or horizontal bar chart showing cost breakdown
+- Each pie slice or bar is color-coded to match its row in the table.
+- Bottom: Grand total in large bold font using --accent color.
+- User can provide data as markdown table, or the AI creates realistic estimates from context.
+- Must use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
+
+COSTING CSS/SVG TEMPLATE:
+body { display:flex; flex-direction:column; width:960px; height:540px; font-family:'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+.header { padding:12px 20px; }
+.content { display:flex; flex:1; gap:20px; padding:0 20px; }
+.table-side { flex:3; }
+.chart-side { flex:2; display:flex; align-items:center; justify-content:center; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { background:var(--accent); color:#fff; padding:6px 10px; text-align:left; }
+td { padding:5px 10px; border-bottom:1px solid var(--border); }
+.total { font-size:22px; font-weight:bold; color:var(--accent); text-align:right; padding:8px 20px; }`;
 
         if (mode === 'script') {
             return basePrompt + `
