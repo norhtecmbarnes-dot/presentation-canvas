@@ -188,6 +188,7 @@ body { background: #333; }
 
     function renderSlideToPng(slideHtml) {
         return new Promise((resolve) => {
+            // Primary approach: iframe with html2canvas/html-to-image targeting body
             const iframe = document.createElement('iframe');
             iframe.style.cssText = 'position:absolute;left:-9999px;top:0;width:960px;height:540px;border:none;';
             document.body.appendChild(iframe);
@@ -197,14 +198,12 @@ body { background: #333; }
             doc.write(slideHtml);
             doc.close();
 
-            // Wait for iframe DOM to be fully loaded
             const waitForReady = () => new Promise(r => {
                 if (doc.readyState === 'complete') r();
                 else doc.addEventListener('DOMContentLoaded', r, { once: true });
             });
 
             waitForReady().then(async () => {
-                // Extra frame for CSS/layout paint
                 await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
                 try {
@@ -228,27 +227,92 @@ body { background: #333; }
                             useCORS: false,
                             allowTaint: true,
                             logging: false,
+                            foreignObjectRendering: true,
                             scrollX: 0,
                             scrollY: 0,
                             windowWidth: 960,
-                            windowHeight: 540
+                            windowHeight: 540,
+                            onclone: (clonedDoc) => {
+                                console.log('html2canvas cloned body styles:', clonedDoc.body.style.cssText);
+                            }
                         });
                         iframe.remove();
                         resolve(canvas.toDataURL('image/png'));
                         return;
                     }
                     iframe.remove();
-                    resolve(await fallbackRender(slideHtml));
+                    resolve(await divRenderFallback(slideHtml));
                 } catch (e) {
-                    console.warn('Render failed:', e);
+                    console.warn('iframe render failed, trying div fallback:', e);
                     try { iframe.remove(); } catch(ex) {}
-                    resolve(await fallbackRender(slideHtml));
+                    resolve(await divRenderFallback(slideHtml));
                 }
             });
         });
     }
 
-    async function fallbackRender(slideHtml) {
+    async function divRenderFallback(slideHtml) {
+        // Fallback: rewrite body/html selectors to .slide-wrapper using DOMParser (not regex)
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(slideHtml, 'text/html');
+        const style = doc.querySelector('style');
+        if (style) {
+            style.textContent = style.textContent
+                .replace(/body/g, '.slide-wrapper')
+                .replace(/html/g, '.slide-wrapper');
+        }
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'slide-wrapper';
+        wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;position:absolute;left:-9999px;top:0;';
+        // Apply body inline styles to wrapper
+        const bodyEl = doc.querySelector('body');
+        if (bodyEl) {
+            wrapper.innerHTML = (style ? `<style>${style.textContent}</style>` : '') + bodyEl.innerHTML;
+            const bodyStyle = bodyEl.getAttribute('style');
+            if (bodyStyle) wrapper.style.cssText += ';' + bodyStyle;
+        }
+        document.body.appendChild(wrapper);
+
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        try {
+            if (typeof html2canvas !== 'undefined') {
+                const canvas = await html2canvas(wrapper, {
+                    width: 960,
+                    height: 540,
+                    scale: 2,
+                    backgroundColor: null,
+                    useCORS: false,
+                    allowTaint: true,
+                    logging: false,
+                    foreignObjectRendering: true,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: 960,
+                    windowHeight: 540
+                });
+                wrapper.remove();
+                return canvas.toDataURL('image/png');
+            }
+            if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
+                const dataUrl = await htmlToImage.toPng(wrapper, {
+                    width: 960,
+                    height: 540,
+                    pixelRatio: 2,
+                    backgroundColor: null
+                });
+                wrapper.remove();
+                return dataUrl;
+            }
+        } catch (e) {
+            console.warn('div fallback also failed:', e);
+        }
+        wrapper.remove();
+        return canvasFallbackRender(slideHtml);
+    }
+
+    async function canvasFallbackRender(slideHtml) {
         // Last resort: create a canvas with just the background color
         const parser = new DOMParser();
         const doc = parser.parseFromString(slideHtml, 'text/html');
