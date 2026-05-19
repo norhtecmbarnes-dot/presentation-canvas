@@ -93,37 +93,18 @@ body { background: #333; }
         document.body.appendChild(overlay);
         const progress = overlay.querySelector('#pptx-progress');
 
-        // Load rendering libraries: dom-to-image-more (primary), html2canvas (backup)
-        if (typeof domtoimage === 'undefined') {
+        // Load html2canvas for slide rendering
+        if (typeof html2canvas === 'undefined') {
             try {
-                await loadScript('https://www.npmcdn.org/dom-to-image-more/dom-to-image-more.umd.min.js');
+                await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
             } catch (e) {
                 try {
-                    await loadScript('https://cdn.jsdelivr.net/npm/dom-to-image-more@4.3.0/dist/dom-to-image-more.umd.min.js');
+                    await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
                 } catch (e2) {
-                    // Fall back to html2canvas
-                    if (typeof html2canvas === 'undefined') {
-                        try {
-                            await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
-                        } catch (e3) {
-                            try {
-                                await loadScript('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js');
-                            } catch (e4) {
-                                // Try html-to-image
-                                if (typeof htmlToImage === 'undefined') {
-                                    try {
-                                        await loadScript('https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js');
-                                    } catch (e5) {
-                                        // Will use iframe/doc write fallback
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-                    }
+                    overlay.remove();
+                    alert('Failed to load rendering library. Opening HTML export instead.');
+                    fallbackHtmlExport(slides, title);
+                    return;
                 }
             }
         }
@@ -194,320 +175,169 @@ body { background: #333; }
     };
 
     function extractBgColor(slideHtml) {
-        let bg = '#1a1a2e';
         try {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(slideHtml, 'text/html');
-            const style = doc.querySelector('style');
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(slideHtml, 'text/html');
+            var style = doc.querySelector('style');
             if (style) {
-                const css = style.textContent;
-                const m = css.match(/--bg\s*:\s*([^;}\n]+)/);
-                if (m) bg = m[1].trim();
-                const m2 = css.match(/body\s*\{[^}]*background(?:-color)?\s*:\s*([^;}\n]+)/);
-                if (m2) bg = m2[1].trim();
-                const m3 = css.match(/background\s*:\s*linear-gradient\([^,]+,\s*([^,\s)]+)/);
-                if (m3) bg = m3[1].trim();
-            }
-            const body = doc.querySelector('body');
-            if (body) {
-                const m = body.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;}"']+)/);
-                if (m) bg = m[1].trim();
-            }
-        } catch (e) { /* keep default */ }
-        return bg;
-    }
-
-    function renderSlideToPng(slideHtml) {
-        return new Promise(async (resolve) => {
-            const bgColor = extractBgColor(slideHtml);
-
-            // PRIMARY: Render in a div in the main document (html2canvas can read computed styles)
-            // Use DOMParser to rewrite body/html selectors to .slide-wrapper
-            try {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(slideHtml, 'text/html');
-
-                // Get and transform the CSS
-                const styleEl = doc.querySelector('style');
-                let css = styleEl ? styleEl.textContent : '';
-
-                // Rewrite selectors: body -> .slide-wrapper, html -> .slide-wrapper
-                css = css
-                    .replace(/(^|[\s{}>,+~])body(?=[\s{}:,.\[#])/gm, '$1.slide-wrapper')
-                    .replace(/(^|[\s{}>,+~])html(?=[\s{}:,.\[#])/gm, '$1.slide-wrapper')
-                    .replace(/min-height\s*:\s*100vh/gi, 'min-height:100%')
-                    .replace(/height\s*:\s*100vh/gi, 'height:100%');
-
-                // Replace gradients with solid colors for reliable rendering
-                css = css.replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
-                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
-                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
-                    return match;
-                });
-                css = css.replace(/background-image\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
-                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
-                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
-                    return match;
-                });
-
-                // Build the wrapper div
-                const wrapper = document.createElement('div');
-                wrapper.className = 'slide-wrapper';
-                const bodyEl = doc.querySelector('body');
-                const bodyInlineStyle = bodyEl ? (bodyEl.getAttribute('style') || '') : '';
-
-                // Force exact dimensions and prevent overflow
-                let wrapperCSS = `width:960px;height:540px;overflow:hidden;position:fixed;left:-9999px;top:0;z-index:-9999;${bodyInlineStyle}`;
-                wrapper.style.cssText = wrapperCSS;
-                wrapper.innerHTML = `<style>${css}</style>${bodyEl ? bodyEl.innerHTML : slideHtml}`;
-
-                document.body.appendChild(wrapper);
-
-                // Wait for CSS paint
-                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-                // Try dom-to-image-more first (more reliable)
-                if (typeof domtoimage !== 'undefined' && domtoimage) {
-                    try {
-                        domtoimage.toBlob(wrapper, (blob) => {
-                            wrapper.remove();
-                            resolve(blob ? blob.toDataURL('image/png') : 'image/png');
-                        }, 'image/png', 2);
-                        return;
-                    } catch (e) {
-                        console.warn('dom-to-image-more failed:', e);
+                var css = style.textContent.replace(/\n/g, ' ');
+                var match = css.match(/background(?:-color)?\s*:\s*([^;}]*(?:\([^)]*\)[^;}]*)*)/);
+                if (match) {
+                    var val = match[1].trim();
+                    var full = val.match(/#[0-9a-fA-F]{6}/);
+                    if (full) return full[0];
+                    var short = val.match(/#[0-9a-fA-F]{3}/);
+                    if (short) {
+                        var h = short[0];
+                        return '#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
                     }
                 }
-
-                // Fallback to html2canvas
-                if (typeof html2canvas !== 'undefined') {
-                    const canvas = await html2canvas(wrapper, {
-                        width: 960,
-                        height: 540,
-                        scale: 2,
-                        backgroundColor: bgColor,
-                        useCORS: true,
-                        allowTaint: true,
-                        logging: false,
-                        scrollX: 0,
-                        scrollY: 0,
-                        windowWidth: 960,
-                        windowHeight: 540
-                    });
-                    wrapper.remove();
-                    resolve(canvas.toDataURL('image/png'));
-                    return;
-                }
-
-                // Fallback to html-to-image
-                if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
-                    const dataUrl = await htmlToImage.toPng(wrapper, {
-                        width: 960,
-                        height: 540,
-                        pixelRatio: 2,
-                        backgroundColor: bgColor
-                    });
-                    wrapper.remove();
-                    resolve(dataUrl);
-                    return;
-                }
-            } catch (e) {
-                console.warn('Div render failed:', e);
             }
+        } catch (e) {}
+        return '#1a1a2e';
+    }
 
-            // FALLBACK: iframe approach
-            resolve(await iframeRenderFallback(slideHtml, bgColor));
+    function gradientToSolid(css) {
+        return css.replace(/background(?:-image)?\s*:\s*linear-gradient\s*\([\s\S]*?\)/g, function (match) {
+            var raw = match.match(/^[^(]*\(([\s\S]*)\)/);
+            if (!raw) return match;
+            var stops = [];
+            var depth = 0, start = 0;
+            for (var i = 0; i < raw[1].length; i++) {
+                if (raw[1][i] === '(') depth++;
+                else if (raw[1][i] === ')') depth--;
+                else if (raw[1][i] === ',' && depth === 0) {
+                    stops.push(raw[1].substring(start, i).trim());
+                    start = i + 1;
+                }
+            }
+            stops.push(raw[1].substring(start).trim());
+            stops = stops.filter(function (s) {
+                return /#|rgb|hsl/.test(s);
+            });
+            if (stops.length >= 2) return 'background: ' + stops[1];
+            if (stops.length === 1) return 'background: ' + stops[0];
+            return match;
         });
     }
 
-    function iframeRenderFallback(slideHtml, bgColor) {
-        return new Promise((resolve, reject) => {
-            let sizedHtml = slideHtml
-                .replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
-                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
-                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
-                    return match;
-                })
-                .replace(/background-image\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
-                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
-                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
-                    return match;
-                });
-            sizedHtml = sizedHtml.replace('</head>', '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style></head>');
+    function renderSlideToPng(slideHtml) {
+        return new Promise(function (resolve) {
+            var bgColor = extractBgColor(slideHtml);
 
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:960px;height:540px;border:none;';
+            var sizedHtml = gradientToSolid(slideHtml);
+            sizedHtml = sizedHtml.replace('</head>',
+                '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;margin:0!important;padding:0!important;}</style></head>');
 
-            iframe.onload = () => {
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                setTimeout(async () => {
-                    try {
-                        if (typeof html2canvas !== 'undefined') {
-                            const canvas = await html2canvas(iframeDoc.body, {
-                                width: 960, height: 540, scale: 2,
-                                backgroundColor: bgColor, useCORS: true, allowTaint: true,
-                                logging: false, scrollX: 0, scrollY: 0,
-                                windowWidth: 960, windowHeight: 540
-                            });
-                            document.body.removeChild(iframe);
-                            resolve(canvas.toDataURL('image/png'));
-                        } else {
-                            document.body.removeChild(iframe);
-                            resolve(await divRenderFallback(slideHtml));
-                        }
-                    } catch (e) {
-                        try { document.body.removeChild(iframe); } catch(ex) {}
-                        resolve(await divRenderFallback(slideHtml));
+            var iframe = document.createElement('iframe');
+            // Position at viewport origin behind the export overlay (z-index:9999)
+            iframe.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px;border:none;z-index:2;background:transparent;';
+
+            iframe.onload = function () {
+                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                setTimeout(function () {
+                    if (typeof html2canvas === 'undefined') {
+                        try { document.body.removeChild(iframe); } catch (ex) {}
+                        resolve(createSolidColorSlide(slideHtml, bgColor));
+                        return;
                     }
-                }, 500);
+                    html2canvas(iframeDoc.body, {
+                        width: 960, height: 540, scale: 2,
+                        backgroundColor: bgColor,
+                        useCORS: true, allowTaint: true,
+                        logging: false,
+                        scrollX: 0, scrollY: 0,
+                        windowWidth: 960, windowHeight: 540
+                    }).then(function (canvas) {
+                        document.body.removeChild(iframe);
+                        resolve(canvas.toDataURL('image/png'));
+                    }).catch(function (err) {
+                        console.warn('html2canvas iframe render failed:', err);
+                        try { document.body.removeChild(iframe); } catch (ex) {}
+                        resolve(createSolidColorSlide(slideHtml, bgColor));
+                    });
+                }, 200);
             };
 
-            iframe.onerror = () => {
-                try { document.body.removeChild(iframe); } catch(ex) {}
-                divRenderFallback(slideHtml).then(resolve);
+            iframe.onerror = function () {
+                try { document.body.removeChild(iframe); } catch (ex) {}
+                createSolidColorSlide(slideHtml, bgColor).then(resolve);
             };
 
             document.body.appendChild(iframe);
-            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            var doc = iframe.contentDocument || iframe.contentWindow.document;
             doc.open();
             doc.write(sizedHtml);
             doc.close();
         });
     }
 
-    async function divRenderFallback(slideHtml) {
-        // Fallback: rewrite body/html selectors to .slide-wrapper using DOMParser (not regex)
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(slideHtml, 'text/html');
-        const style = doc.querySelector('style');
-        if (style) {
-            style.textContent = style.textContent
-                .replace(/body/g, '.slide-wrapper')
-                .replace(/html/g, '.slide-wrapper');
-        }
+    function createSolidColorSlide(slideHtml, bgColor) {
+        return new Promise(function (resolve) {
+            try {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(slideHtml, 'text/html');
+                var canvas = document.createElement('canvas');
+                canvas.width = 1920;
+                canvas.height = 1080;
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, 1920, 1080);
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'slide-wrapper';
-        wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;position:absolute;left:-9999px;top:0;';
-        // Apply body inline styles to wrapper
-        const bodyEl = doc.querySelector('body');
-        if (bodyEl) {
-            wrapper.innerHTML = (style ? `<style>${style.textContent}</style>` : '') + bodyEl.innerHTML;
-            const bodyStyle = bodyEl.getAttribute('style');
-            if (bodyStyle) wrapper.style.cssText += ';' + bodyStyle;
-        }
-        document.body.appendChild(wrapper);
+                var headings = doc.querySelectorAll('h1, h2, h3');
+                var pars = doc.querySelectorAll('p, li');
+                var y = 80;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#ffffff';
 
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        try {
-            if (typeof html2canvas !== 'undefined') {
-                const canvas = await html2canvas(wrapper, {
-                    width: 960,
-                    height: 540,
-                    scale: 2,
-                    backgroundColor: null,
-                    useCORS: false,
-                    allowTaint: true,
-                    logging: false,
-                    foreignObjectRendering: true,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: 960,
-                    windowHeight: 540
-                });
-                wrapper.remove();
-                return canvas.toDataURL('image/png');
-            }
-            if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
-                const dataUrl = await htmlToImage.toPng(wrapper, {
-                    width: 960,
-                    height: 540,
-                    pixelRatio: 2,
-                    backgroundColor: null
-                });
-                wrapper.remove();
-                return dataUrl;
-            }
-        } catch (e) {
-            console.warn('div fallback also failed:', e);
-        }
-        wrapper.remove();
-        return canvasFallbackRender(slideHtml);
-    }
-
-    async function canvasFallbackRender(slideHtml) {
-        // Last resort: create a canvas with just the background color
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(slideHtml, 'text/html');
-        const body = doc.querySelector('body');
-        const style = doc.querySelector('style');
-
-        let bgColor = '#1a1a2e';
-        if (style) {
-            const bgMatch = style.textContent.match(/background(?:-color)?\s*:\s*([^;}\n]+)/);
-            if (bgMatch) {
-                const val = bgMatch[1].trim();
-                if (val.startsWith('#')) bgColor = val;
-                else if (val.startsWith('linear-gradient')) {
-                    const cm = val.match(/#([0-9a-fA-F]{3,8})/);
-                    if (cm) bgColor = '#' + cm[1];
-                }
-            }
-        }
-        if (body) {
-            const bbg = body.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;}"']+)/);
-            if (bbg) bgColor = bbg[1].trim();
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = 1920;
-        canvas.height = 1080;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = bgColor;
-        ctx.fillRect(0, 0, 1920, 1080);
-
-        // Extract and draw text
-        const headings = doc.querySelectorAll('h1, h2, h3');
-        const pars = doc.querySelectorAll('p, li');
-        let y = 80;
-        ctx.textAlign = 'left';
-        ctx.fillStyle = '#ffffff';
-
-        headings.forEach(h => {
-            const sz = h.tagName === 'H1' ? 48 : h.tagName === 'H2' ? 36 : 28;
-            ctx.font = `bold ${sz}px "Segoe UI", sans-serif`;
-            const color = h.getAttribute('style')?.match(/color\s*:\s*([^;}"']+)/);
-            if (color) ctx.fillStyle = color[1].trim();
-            ctx.fillText(h.textContent.trim(), 80, y);
-            y += sz + 10;
-        });
-
-        ctx.font = '18px "Segoe UI", sans-serif';
-        pars.forEach(p => {
-            if (y > 1040) return;
-            const text = p.textContent.trim();
-            if (text.length > 100) {
-                // Word wrap
-                const words = text.split(' ');
-                let line = '';
-                for (const word of words) {
-                    if ((line + ' ' + word).length > 100) {
-                        ctx.fillText(line, 80, y);
-                        y += 24;
-                        line = word;
-                    } else {
-                        line = line ? line + ' ' + word : word;
+                headings.forEach(function (h) {
+                    var sz = h.tagName === 'H1' ? 52 : h.tagName === 'H2' ? 36 : 28;
+                    ctx.font = 'bold ' + sz + 'px "Segoe UI", sans-serif';
+                    var colorAttr = h.getAttribute('style');
+                    if (colorAttr) {
+                        var cm = colorAttr.match(/color\s*:\s*([^;}"']+)/);
+                        if (cm) ctx.fillStyle = cm[1].trim();
                     }
-                }
-                if (line) ctx.fillText(line, 80, y);
-            } else {
-                ctx.fillText(text, 80, y);
-            }
-            y += 24;
-        });
+                    ctx.fillText(h.textContent.trim(), 80, y);
+                    ctx.fillStyle = '#ffffff';
+                    y += sz + 12;
+                });
 
-        return canvas.toDataURL('image/png');
+                ctx.font = '18px "Segoe UI", sans-serif';
+                pars.forEach(function (p) {
+                    if (y > 1040) return;
+                    var text = p.textContent.trim();
+                    if (text.length > 100) {
+                        var words = text.split(' ');
+                        var line = '';
+                        for (var wi = 0; wi < words.length; wi++) {
+                            var word = words[wi];
+                            if ((line + ' ' + word).length > 100) {
+                                ctx.fillText(line, 80, y);
+                                y += 24;
+                                line = word;
+                            } else {
+                                line = line ? line + ' ' + word : word;
+                            }
+                        }
+                        if (line) ctx.fillText(line, 80, y);
+                    } else {
+                        ctx.fillText(text, 80, y);
+                    }
+                    y += 24;
+                });
+
+                resolve(canvas.toDataURL('image/png'));
+            } catch (e) {
+                var canvas2 = document.createElement('canvas');
+                canvas2.width = 1920;
+                canvas2.height = 1080;
+                var ctx2 = canvas2.getContext('2d');
+                ctx2.fillStyle = bgColor;
+                ctx2.fillRect(0, 0, 1920, 1080);
+                resolve(canvas2.toDataURL('image/png'));
+            }
+        });
     }
 
     function loadScript(src) {

@@ -2,7 +2,7 @@
 
 **AI-powered slide builder for government proposals, business pitches, and professional presentations.**
 
-![Version](https://img.shields.io/badge/version-2.1-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple)
+![Version](https://img.shields.io/badge/version-2.2-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple)
 
 ---
 
@@ -38,16 +38,23 @@ Government bids demand specific formats — quad charts, RACI matrices, Gantt ti
 
 | Keyword | Mode | Behavior |
 |---------|------|----------|
-| "gov bid", "proposal", "compact bid" | Government Bid | Asks for max slide count (default 5), concise bullets, professional styling |
+| "gov bid", "proposal", "compact bid" | Government Bid | Default 5 slides, concise bullets, dark navy styling |
 | "quad chart", "quadrant chart" | Quad Chart | 2×2 matrix with titled quadrants |
 | "Gantt", "timeline", "project schedule" | Gantt Chart | Inline SVG horizontal bar chart |
 | "RACI", "responsibility matrix" | RACI Matrix | Color-coded responsibility assignment table |
 | "cost", "budget", "pricing" | Costing | Split table + pie/bar chart with grand total |
-| "pptx", "powerpoint" | PPTX Export | Simplified absolute-positioned HTML for converter |
+| "bar chart", "comparison" | Bar Chart | Inline SVG vertical bar chart with axis labels |
+| "pie chart", "donut", "percentage" | Pie / Donut Chart | Inline SVG arc segments with legend |
+| "roadmap", "milestones" | Timeline | Horizontal SVG milestones with date markers |
+| "SWOT", "strengths weaknesses" | SWOT Analysis | 2×2 color-coded quadrant cards |
+| "KPI", "dashboard", "metrics" | KPI Dashboard | 4-card metric grid with delta indicators |
+| "org chart", "hierarchy" | Org Chart | Flexbox hierarchy with SVG connector lines |
+| "vs", "compare", "alternatives" | Comparison Table | Check/cross table with green/red indicators |
 
 ### Session & Organization
 
-- **Session Sidebar** — Auto-archives previous presentations. Switch between decks instantly. Sidebar opens by default.
+- **Session Sidebar** — Auto-pins previous presentations when starting a new one. Pin/unpin sessions with ★, clear all unpinned in one click, double-click to rename any session. Sidebar state persists across reloads.
+- **Template Import** — Import from clipboard or file with auto-detection of JSON, HTML, or Markdown. Includes a copy-pasteable LLM prompt for generating templates via Gemini, ChatGPT, or any AI. Validates slide quality on import.
 - **Max Slides** — Number input in the mode bar controls deck length before generation.
 - **Footer Label** — Add "CUI", "Company Sensitive", "Do Not Distribute" labels to every slide.
 - **Logo System** — Upload once, pick position and size, apply to all slides with one click.
@@ -57,8 +64,8 @@ Government bids demand specific formats — quad charts, RACI matrices, Gantt ti
 ### Export
 
 - **PDF** — Print-optimized with landscape layout and background color support
-- **PPTX** — Each slide rendered as a high-fidelity image inside a PowerPoint deck. Full visual fidelity, not text-editable.
-- **Template Import/Export** — JSON, HTML, Markdown, or clipboard
+- **PPTX** — Each slide rendered as a high-fidelity image inside a PowerPoint deck. Full visual fidelity, not text-editable. Uses html2canvas with solid-color rendering for reliability.
+- **Template Import/Export** — JSON, HTML, Markdown, or clipboard with auto-detection
 
 ### Presentation
 

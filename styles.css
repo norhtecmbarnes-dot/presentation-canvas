@@ -1082,29 +1082,47 @@ body {
     background: rgba(79, 195, 247, 0.1);
 }
 
-.session-item.archived {
-    border-left: 3px solid #66bb6a;
-}
-
-.session-item.archived .session-item-title {
-    opacity: 0.85;
-}
-
-.session-badge {
-    display: inline-block;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 1px 6px;
+.session-item-pin {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 5px;
     border-radius: 3px;
-    margin-right: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    vertical-align: middle;
+    transition: all 0.15s;
 }
 
-.archived-badge {
-    background: rgba(102, 187, 106, 0.15);
-    color: #66bb6a;
+.session-item-pin:hover {
+    color: #ffca28;
+    background: rgba(255, 202, 40, 0.1);
+}
+
+.session-item-pin.pinned {
+    color: #ffca28;
+}
+
+.session-item.pinned {
+    border-left: 3px solid #ffca28;
+    background: rgba(255, 202, 40, 0.05);
+}
+
+.session-count {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-left: 4px;
+}
+
+.session-title-edit {
+    width: 100%;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--accent);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+    font-family: inherit;
 }
 
 #sidebar-toggle-btn {
@@ -1154,21 +1172,6 @@ body {
     font-weight: 500;
 }
 
-/* ===== MODE BAR ===== */
-#mode-bar {
-    padding: 8px 12px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12px;
-}
-
-#mode-bar label {
-    color: var(--text-secondary);
-    white-space: nowrap;
-}
-
 #max-slides-input {
     background: var(--bg-tertiary);
     color: var(--text-primary);
@@ -1205,48 +1208,6 @@ body {
 #footer-label-input::placeholder {
     color: var(--text-secondary);
     opacity: 0.6;
-}
-
-.mode-btn {
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    padding: 5px 14px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.mode-btn.active {
-    background: var(--accent);
-    color: var(--bg-primary);
-    border-color: var(--accent);
-}
-
-.mode-btn:hover {
-    border-color: var(--accent);
-}
-
-.mode-btn-edit.active {
-    background: #ff9800;
-    border-color: #ff9800;
-}
-
-#gen-mode-select {
-    flex: 1;
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-}
-
-#chat-btn-row {
-    display: flex;
-    gap: 6px;
 }
 
 #chat-regenerate-btn {

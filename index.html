@@ -41,13 +41,16 @@
 
         <div id="main-content">
             <!-- Session History Sidebar -->
-            <aside id="session-sidebar">
-                <div id="session-sidebar-header">
-                    <h3>History</h3>
+        <aside id="session-sidebar">
+            <div id="session-sidebar-header">
+                <h3>History <span class="session-count"></span></h3>
+                <div style="display:flex;gap:4px;">
+                    <button id="clear-sessions-btn" title="Clear all unpinned sessions" style="background:var(--bg-tertiary);color:var(--danger);border:1px solid var(--border);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;">Clear</button>
                     <button id="new-session-btn" title="Start new presentation">+ New</button>
                 </div>
-                <div id="session-list"></div>
-            </aside>
+            </div>
+            <div id="session-list"></div>
+        </aside>
 
             <!-- Left Panel - Chat -->
             <aside id="chat-panel">
@@ -236,8 +239,50 @@
                     <span id="import-file-name" style="margin-left:10px;color:var(--text-secondary);font-size:13px;">No file selected</span>
                 </div>
                 <div id="import-clipboard-area" style="display:none;margin-top:12px;">
-                    <label>Paste HTML or Markdown slides:</label>
+                    <label>Paste HTML, Markdown, or JSON template:</label>
                     <textarea id="import-clipboard-text" rows="6" style="width:100%;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);padding:10px;border-radius:4px;font-family:monospace;font-size:13px;" placeholder="Paste your content here..."></textarea>
+                    <details style="margin-top:8px;font-size:12px;color:var(--text-secondary);">
+                      <summary style="cursor:pointer;color:var(--accent);">JSON template format</summary>
+                      <pre style="background:var(--bg-primary);padding:10px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;margin-top:6px;">{
+  "name": "My Template",
+  "description": "Description here",
+  "theme": "dark",
+  "slides": [
+    "&lt;!DOCTYPE html&gt;...slide 1 HTML...&lt;/html&gt;",
+    "&lt;!DOCTYPE html&gt;...slide 2 HTML...&lt;/html&gt;"
+  ]
+}</pre>
+                    </details>
+                    <details style="margin-top:8px;font-size:12px;color:var(--text-secondary);">
+                      <summary style="cursor:pointer;color:#66bb6a;font-weight:600;">Copy this prompt to ask an LLM (Gemini, ChatGPT, etc.) to generate a template</summary>
+                      <div style="position:relative;margin-top:6px;">
+                        <pre id="llm-template-prompt" style="background:var(--bg-primary);padding:14px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;font-size:13px;line-height:1.6;">I need a presentation template in JSON format for Presentation Canvas. Please analyze this presentation and output ONLY valid JSON — no markdown, no explanations.
+
+Required JSON format:
+{
+  "name": "template name (short)",
+  "description": "what this template is for",
+  "theme": "dark",
+  "slides": [
+    "full slide HTML here",
+    "full slide HTML here"
+  ]
+}
+
+Theme must be one of: dark, light, blue, green, red.
+
+EACH slide in the "slides" array MUST:
+- Be a COMPLETE &lt;!DOCTYPE html&gt;...&lt;/html&gt; document as a single string
+- Use 960px wide by 540px tall (16:9), with body { width:960px; height:540px; overflow:hidden; }
+- Put all CSS in a &lt;style&gt; tag inside &lt;head&gt; — no external links, no JavaScript
+- Use ONLY solid background colors (no gradients), flexbox/grid layout, Arial/Segoe UI fonts
+- Be under 3000 characters each
+- Use real, meaningful content — never lorem ipsum
+
+Output ONLY the JSON. Do not wrap it in markdown code blocks.</pre>
+                        <button id="copy-llm-prompt-btn" style="position:absolute;top:4px;right:4px;background:var(--bg-tertiary);color:var(--accent);border:1px solid var(--border);padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;">Copy</button>
+                      </div>
+                    </details>
                 </div>
                 <div style="margin-top:12px;">
                     <label>

@@ -257,56 +257,92 @@ p { font-size: 24px; color: #a0a0b0; }
         renderSessionList();
     }
 
+    function finishRename(inputEl, session) {
+        var newTitle = inputEl.value.trim() || session.title || 'Untitled';
+        session.title = newTitle;
+        saveSessions();
+        if (session.id === state.currentSessionId) {
+            document.getElementById('presentation-title').value = newTitle;
+        }
+        renderSessionList();
+    }
+
     function renderSessionList() {
-        const container = document.getElementById('session-list');
+        var container = document.getElementById('session-list');
         if (!container) return;
         container.innerHTML = '';
-        state.sessions.forEach(session => {
-            const item = document.createElement('div');
-            item.className = 'session-item' + (session.id === state.currentSessionId ? ' active' : '') + (session.archived ? ' archived' : '');
-            const date = new Date(session.updatedAt || session.createdAt);
-            const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            const slideCount = session.slides ? session.slides.length : 0;
-            const isDefault = (slideCount === 1 && session.slides && session.slides[0] === DEFAULT_SLIDE_HTML);
-            const badge = session.archived ? '<span class="session-badge archived-badge">saved</span>' : '';
-            const downloadBtn = (!isDefault || session.archived) ? `<button class="session-item-download" data-id="${session.id}" title="Download HTML">&#8595;</button>` : '';
-            item.innerHTML = `<div class="session-item-title">${escapeHtml(session.title || 'Untitled')}</div><div class="session-item-meta">${badge}${slideCount} slides | ${timeStr}</div><div class="session-item-actions">${downloadBtn}<button class="session-item-delete" data-id="${session.id}" title="Delete">&times;</button></div>`;
-            item.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('session-item-delete') && !e.target.classList.contains('session-item-download')) {
+        state.sessions.forEach(function (session) {
+            var item = document.createElement('div');
+            item.className = 'session-item' + (session.id === state.currentSessionId ? ' active' : '');
+            var date = new Date(session.updatedAt || session.createdAt);
+            var timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            var slideCount = session.slides ? session.slides.length : 0;
+            var isDefault = (slideCount === 1 && session.slides && session.slides[0] === DEFAULT_SLIDE_HTML);
+            var pinBtn = '<button class="session-item-pin' + (session.pinned ? ' pinned' : '') + '" data-id="' + session.id + '" title="' + (session.pinned ? 'Unpin' : 'Pin') + '">' + (session.pinned ? '\u2605' : '\u2606') + '</button>';
+            var downloadBtn = (!isDefault) ? '<button class="session-item-download" data-id="' + session.id + '" title="Download HTML">&#8595;</button>' : '';
+            item.innerHTML = '<div class="session-item-title">' + escapeHtml(session.title || 'Untitled') + '</div><div class="session-item-meta">' + slideCount + ' slides &middot; ' + timeStr + '</div><div class="session-item-actions">' + pinBtn + downloadBtn + '<button class="session-item-delete" data-id="' + session.id + '" title="Delete">&times;</button></div>';
+            item.addEventListener('click', function (e) {
+                if (!e.target.classList.contains('session-item-delete') && !e.target.classList.contains('session-item-download') && !e.target.classList.contains('session-item-pin')) {
                     switchSession(session.id);
                 }
             });
             container.appendChild(item);
         });
-        container.querySelectorAll('.session-item-delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        container.querySelectorAll('.session-item-delete').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 deleteSession(btn.dataset.id);
             });
         });
-        container.querySelectorAll('.session-item-download').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        container.querySelectorAll('.session-item-download').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
                 e.stopPropagation();
                 downloadSessionHTML(btn.dataset.id);
             });
         });
+        container.querySelectorAll('.session-item-pin').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                togglePinSession(btn.dataset.id);
+            });
+        });
+        updateSidebarHeader();
+    }
+
+    function updateSidebarHeader() {
+        var header = document.getElementById('session-sidebar-header');
+        if (!header) return;
+        var countEl = header.querySelector('.session-count');
+        if (!countEl) {
+            countEl = document.createElement('span');
+            countEl.className = 'session-count';
+            header.appendChild(countEl);
+        }
+        countEl.textContent = '(' + state.sessions.length + ')';
+    }
+
+    function clearAllSessions() {
+        if (state.sessions.length <= 1) return;
+        state.sessions = state.sessions.filter(function (s) { return s.pinned || s.id === state.currentSessionId; });
+        if (state.sessions.length === 0) {
+            createSession('Welcome');
+        } else {
+            var pinned = state.sessions.filter(function (s) { return s.pinned; });
+            if (pinned.length === 0 && state.currentSessionId) {
+                state.currentSessionId = state.sessions[0].id;
+                loadSessionIntoState(state.sessions[0]);
+            }
+        }
+        saveSessions();
+        renderSessionList();
+        renderAll();
+        addSystemMessage('Cleared unpinned sessions. Pinned sessions preserved.');
     }
 
     function escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
-    }
-
-    function loadSlides() {
-        if (state.currentSessionId) {
-            const session = state.sessions.find(s => s.id === state.currentSessionId);
-            if (session && session.slides && session.slides.length > 0) {
-                loadSessionIntoState(session);
-                return true;
-            }
-        }
-        return false;
     }
 
     function saveSlides() {
@@ -871,309 +907,304 @@ p { font-size: 24px; color: #a0a0b0; }
     }
 
     function getSlideSystemPrompt(mode) {
-        const theme = SLIDE_THEMES[state.currentTheme];
-        const cssVars = `--bg:${theme.background};--text:${theme.color};--accent:${theme.accent};--h1:${theme.h1Color};--h2:${theme.h2Color};`;
+        const t = SLIDE_THEMES[state.currentTheme];
+        const bg = t.background, c = t.color, ac = t.accent, h1c = t.h1Color;
 
-        const exampleSlide = `<!DOCTYPE html>
-<html>
-<head>
-<style>
-/* All CSS goes here — use CSS variables for easy theming */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  width: 960px;
-  height: 540px;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  overflow: hidden;
-}
-.container {
-  width: 100%;
-  max-width: 860px;
-  padding: 40px;
-  text-align: center;
-}
-</style>
-</head>
-<body>
-<div class="container">
-  <!-- Real slide content here -->
-</div>
-</body>
-</html>`;
+        const ICONS = {
+            check: '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M4 10l4 4 8-8" stroke="%ac%" stroke-width="2" fill="none"/></svg>',
+            star: '<svg viewBox="0 0 20 20" width="20" height="20"><polygon points="10,1 13,7 19,8 14,13 15,19 10,16 5,19 6,13 1,8 7,7" fill="%ac%"/></svg>',
+            person: '<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="7" r="4" fill="%ac%"/><path d="M2 19c0-5 3.5-8 8-8s8 3 8 8" fill="%ac%"/></svg>',
+            clock: '<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="8" stroke="%ac%" stroke-width="1.5" fill="none"/><line x1="10" y1="10" x2="10" y2="6" stroke="%ac%" stroke-width="1.5"/><line x1="10" y1="10" x2="13" y2="10" stroke="%ac%" stroke-width="1.5"/></svg>',
+            gear: '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 1l1.5 3.1 3.4.5-.5 3.4 3.1 1.5-.5 3.4-3.4.5L10 19l-3.1-1.5-3.4-.5.5-3.4L1 10l.5-3.4 3.4-.5L10 1z" stroke="%ac%" stroke-width="1" fill="none"/><circle cx="10" cy="10" r="3" fill="%ac%"/></svg>',
+            shield: '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M10 1L3 5v6c0 4 3 7 7 8 4-1 7-4 7-8V5L10 1z" fill="%ac%"/></svg>',
+            chart: '<svg viewBox="0 0 20 20" width="20" height="20"><rect x="2" y="12" width="4" height="6" fill="%ac%"/><rect x="8" y="6" width="4" height="12" fill="%ac%"/><rect x="14" y="3" width="4" height="15" fill="%ac%"/></svg>',
+            target: '<svg viewBox="0 0 20 20" width="20" height="20"><circle cx="10" cy="10" r="8" stroke="%ac%" fill="none"/><circle cx="10" cy="10" r="5" stroke="%ac%" fill="none"/><circle cx="10" cy="10" r="2" fill="%ac%"/></svg>',
+            arrow: '<svg viewBox="0 0 20 20" width="20" height="20"><line x1="3" y1="10" x2="16" y2="10" stroke="%ac%" stroke-width="2"/><polyline points="11,6 16,10 11,14" stroke="%ac%" stroke-width="2" fill="none"/></svg>',
+            lock: '<svg viewBox="0 0 20 20" width="20" height="20"><rect x="4" y="9" width="12" height="9" rx="1" fill="%ac%"/><path d="M7 9V6a3 3 0 016 0v3" stroke="%ac%" stroke-width="2" fill="none"/></svg>'
+        };
+        var iconCss = '';
+        for (var ik in ICONS) { iconCss += '- ' + ik + ': ' + ICONS[ik].replace(/%ac%/g, ac) + '\n'; }
 
-        const basePrompt = `You are a world-class professional presentation designer. You create stunning, modern, complete standalone HTML slide documents.
+        const exampleSlide = '<!DOCTYPE html><html><head><style>\n' +
+            '* { margin:0; padding:0; box-sizing:border-box; }\n' +
+            'body { display:flex; align-items:center; justify-content:center; width:960px; height:540px; font-family:\'Segoe UI\',sans-serif; background:' + bg + '; color:' + c + '; overflow:hidden; }\n' +
+            '.container { width:880px; padding:40px; text-align:center; }\n' +
+            '</style></head><body>\n' +
+            '<div class="container"><h1 style="font-size:48px;color:' + h1c + ';">Title</h1><p style="font-size:22px;">Content here</p></div>\n' +
+            '</body></html>';
 
-SLIDE FORMAT — EVERY SLIDE MUST FOLLOW THIS EXACT STRUCTURE:
-Each slide is a COMPLETE, self-contained HTML document. Here is the EXACT format you must produce:
+        const govBg = '#0a2342', govAccent = '#00b4d8';
 
+        const basePrompt =
+`You are a presentation designer. Create complete HTML slides.
+
+EVERY SLIDE is its own HTML document wrapped in these markers:
+<<<SLIDE>>>
+[full HTML from <!DOCTYPE html> to </html>]
+<<<END_SLIDE>>>
+
+MANDATORY RULES:
+1. Slide is 960x540 pixels. body { width:960px; height:540px; overflow:hidden; }
+2. All CSS inside a single <style> tag. No external links, no <script>, no JavaScript.
+3. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks. No other text.
+4. Each slide MUST be under 3000 characters total.
+
+Current theme colors: background=${bg} text=${c} accent=${ac} headings=${h1c}
+Use these EXACT color values in your CSS (not CSS variables).
+
+EXAMPLE of a valid slide:
 ${exampleSlide}
 
-MANDATORY RULES (NEVER BREAK THESE):
-1. EVERY slide MUST start with <!DOCTYPE html> and end with </html>
-2. EVERY slide MUST contain <html>, <head> with <style>, and <body>
-3. ALL CSS must be inside the <style> tag in <head>. No external links, no <script> tags, no JavaScript.
-4. Each slide is exactly 960px wide by 540px tall (16:9). Use width:960px; height:540px; on body.
-5. Wrap EACH slide with these EXACT markers on their own lines:
-<<<SLIDE>>>
-[complete HTML document]
-<<<END_SLIDE>>>
-6. Output NOTHING except the <<<SLIDE>>> / <<<END_SLIDE>>> blocks. No explanations, no markdown, no extra text.
-7. Produce AT LEAST the number of slides requested (more is allowed and often better).
-8. Use meaningful, accurate, engaging content — never lorem ipsum.
+DESIGN RULES:
+- Use solid background colors only. NO linear-gradient, NO radial-gradient.
+- Use display:flex or display:grid for layout. Keep it simple.
+- Fonts: 'Segoe UI', Arial, Helvetica, sans-serif only.
+- Maximum 6-7 lines of text per slide. Be concise.
+- Add a small footer on content slides: 'Slide N | Title'
 
-THEMING (huge upgrade):
-- Current theme CSS variables: ${cssVars}
-- If the user specifies a theme, colors, or style (e.g. "light corporate", "neon cyberpunk", "minimal blue"), override the CSS variables and update all styles accordingly while keeping the same high-quality design standards.
-- Always define CSS custom properties at the top of <style> for easy consistency.
+═══════════════════════════
+BUILT-IN SVG ICONS (copy these into your slides):
+═══════════════════════════
+${iconCss}
 
-DESIGN EXCELLENCE:
-- Use modern flexbox and CSS Grid layouts.
-- Add subtle CSS animations (fade-ins, slide-ins) where appropriate using @keyframes.
-- Include inline SVGs for icons, timelines, simple charts, and diagrams.
-- Excellent typography hierarchy, generous white space, rounded corners, soft shadows, and gradients.
-- Make every slide visually stunning and on-brand across the entire deck.
+To use an icon, copy the SVG code and set width/height as needed.
+For example, a checkmark: <svg viewBox="0 0 20 20" width="24" height="24"><path d="M4 10l4 4 8-8" stroke="${ac}" stroke-width="2" fill="none"/></svg>
+
+═══════════════════════════
+GOVERNMENT BID MODE
+═══════════════════════════
+Trigger: user says "gov bid", "proposal", "compact bid", "quad chart", "RFP", "government".
+Rules:
+- Default 5 slides unless user specifies a number. Use that exact number.
+- Theme override: background=${govBg} text=#ffffff accent=${govAccent} headings=#ffffff
+- Maximum 4 bullets per slide. Large fonts. Minimal text. No decoration.
+- Government style: dark navy background, white text, strong contrast, clean lines.
+- Auto-suggest: Gantt chart, RACI matrix, or costing slide if relevant.
+
+═══════════════════════════
+CHART TYPES — SVG Examples You CAN Copy and Adapt
+═══════════════════════════
+
+=== BAR CHART (comparisons, survey results) ===
+Trigger: "bar chart", "comparison", "survey", "results"
+<svg width="700" height="280" viewBox="0 0 700 280">
+  <!-- 3 bars, heights adjusted to data -->
+  <rect x="60" y="80" width="70" height="160" fill="${ac}" rx="3"/>
+  <text x="95" y="70" text-anchor="middle" fill="${c}" font-size="14">42%</text>
+  <text x="95" y="255" text-anchor="middle" fill="${c}" font-size="12">Label A</text>
+  <rect x="180" y="120" width="70" height="120" fill="${ac}" rx="3" opacity="0.7"/>
+  <text x="215" y="110" text-anchor="middle" fill="${c}" font-size="14">31%</text>
+  <text x="215" y="255" text-anchor="middle" fill="${c}" font-size="12">Label B</text>
+  <rect x="300" y="60" width="70" height="180" fill="${ac}" rx="3" opacity="0.5"/>
+  <text x="335" y="50" text-anchor="middle" fill="${c}" font-size="14">27%</text>
+  <text x="335" y="255" text-anchor="middle" fill="${c}" font-size="12">Label C</text>
+  <!-- Axis -->
+  <line x1="40" y1="20" x2="40" y2="240" stroke="${c}" stroke-width="1" opacity="0.3"/>
+  <line x1="40" y1="240" x2="400" y2="240" stroke="${c}" stroke-width="1" opacity="0.3"/>
+</svg>
+
+=== PIE / DONUT CHART (percentages, breakdown) ===
+Trigger: "pie chart", "donut", "percentage", "breakdown", "proportion"
+<svg width="240" height="240" viewBox="0 0 240 240">
+  <!-- Slice 1: 45% = 0..162 degrees -->
+  <path d="M120 120 L120 30 A90 90 0 0 1 202 174 Z" fill="${ac}"/>
+  <!-- Slice 2: 30% = 162..270 degrees -->
+  <path d="M120 120 L202 174 A90 90 0 0 1 37 174 Z" fill="${ac}" opacity="0.6"/>
+  <!-- Slice 3: 25% = 270..360 degrees -->
+  <path d="M120 120 L37 174 A90 90 0 0 1 120 30 Z" fill="${ac}" opacity="0.3"/>
+  <!-- Legend -->
+  <rect x="180" y="180" width="12" height="12" fill="${ac}"/><text x="196" y="190" fill="${c}" font-size="11">45% A</text>
+  <rect x="180" y="196" width="12" height="12" fill="${ac}" opacity="0.6"/><text x="196" y="206" fill="${c}" font-size="11">30% B</text>
+  <rect x="180" y="212" width="12" height="12" fill="${ac}" opacity="0.3"/><text x="196" y="222" fill="${c}" font-size="11">25% C</text>
+</svg>
+
+=== GANTT CHART (project schedule, timeline) ===
+Trigger: "Gantt", "project schedule", "milestone", "project plan"
+<svg width="900" height="280" viewBox="0 0 900 280">
+  <!-- Month headers -->
+  <text x="220" y="30" fill="${c}" font-size="12">Jun</text>
+  <text x="360" y="30" fill="${c}" font-size="12">Jul</text>
+  <text x="500" y="30" fill="${c}" font-size="12">Aug</text>
+  <text x="640" y="30" fill="${c}" font-size="12">Sep</text>
+  <!-- Grid lines -->
+  <line x1="200" y1="40" x2="200" y2="250" stroke="${c}" stroke-width="1" opacity="0.15"/>
+  <line x1="340" y1="40" x2="340" y2="250" stroke="${c}" stroke-width="1" opacity="0.15"/>
+  <line x1="480" y1="40" x2="480" y2="250" stroke="${c}" stroke-width="1" opacity="0.15"/>
+  <line x1="620" y1="40" x2="620" y2="250" stroke="${c}" stroke-width="1" opacity="0.15"/>
+  <!-- Task 1 -->
+  <text x="10" y="80" fill="${c}" font-size="14">Research</text>
+  <rect x="200" y="65" width="170" height="22" fill="#4fc3f7" rx="3"/>
+  <!-- Task 2 -->
+  <text x="10" y="150" fill="${c}" font-size="14">Development</text>
+  <rect x="220" y="135" width="260" height="22" fill="#66bb6a" rx="3"/>
+  <!-- Task 3 -->
+  <text x="10" y="220" fill="${c}" font-size="14">Testing</text>
+  <rect x="350" y="205" width="180" height="22" fill="#ffa726" rx="3"/>
+</svg>
+
+=== TIMELINE (roadmap, history, milestones) ===
+Trigger: "timeline", "roadmap", "history", "milestones", "when"
+<svg width="900" height="160" viewBox="0 0 900 160">
+  <!-- Horizontal line -->
+  <line x1="50" y1="80" x2="850" y2="80" stroke="${ac}" stroke-width="3"/>
+  <!-- Mile 1 -->
+  <circle cx="120" cy="80" r="14" fill="${ac}"/>
+  <text x="120" y="115" text-anchor="middle" fill="${c}" font-size="12" font-weight="bold">Q1 2026</text>
+  <text x="120" y="130" text-anchor="middle" fill="${c}" font-size="11">Launch MVP</text>
+  <!-- Mile 2 -->
+  <circle cx="350" cy="80" r="14" fill="${ac}" opacity="0.7"/>
+  <text x="350" y="115" text-anchor="middle" fill="${c}" font-size="12" font-weight="bold">Q2 2026</text>
+  <text x="350" y="130" text-anchor="middle" fill="${c}" font-size="11">First customers</text>
+  <!-- Mile 3 -->
+  <circle cx="600" cy="80" r="14" fill="${ac}" opacity="0.5"/>
+  <text x="600" y="115" text-anchor="middle" fill="${c}" font-size="12" font-weight="bold">Q3 2026</text>
+  <text x="600" y="130" text-anchor="middle" fill="${c}" font-size="11">Scale to 10K</text>
+  <!-- Mile 4 -->
+  <circle cx="820" cy="80" r="14" fill="${ac}" opacity="0.3"/>
+  <text x="820" y="115" text-anchor="middle" fill="${c}" font-size="12" font-weight="bold">Q4 2026</text>
+  <text x="820" y="130" text-anchor="middle" fill="${c}" font-size="11">Series A</text>
+</svg>
+
+=== RACI MATRIX (responsibilities, who does what) ===
+Trigger: "RACI", "responsibility", "who does what", "team roles"
+Use a simple HTML <table>:
+<table style="width:100%;border-collapse:collapse;font-size:14px;">
+  <tr><th style="background:${ac};color:#fff;padding:8px;">Task</th><th style="background:${ac};color:#fff;padding:8px;">Alice</th><th style="background:${ac};color:#fff;padding:8px;">Bob</th><th style="background:${ac};color:#fff;padding:8px;">Carol</th></tr>
+  <tr><td style="padding:6px;border:1px solid ${c}22;">Strategy</td><td style="text-align:center;background:#1565c0;color:#fff;font-weight:bold;">A</td><td style="text-align:center;background:#2e7d32;color:#fff;">R</td><td style="text-align:center;background:#757575;color:#fff;">I</td></tr>
+  <tr><td style="padding:6px;border:1px solid ${c}22;">Design</td><td style="text-align:center;background:#ef6c00;color:#fff;">C</td><td style="text-align:center;background:#1565c0;color:#fff;font-weight:bold;">A</td><td style="text-align:center;background:#2e7d32;color:#fff;">R</td></tr>
+  <tr><td style="padding:6px;border:1px solid ${c}22;">Development</td><td style="text-align:center;background:#757575;color:#fff;">I</td><td style="text-align:center;background:#ef6c00;color:#fff;">C</td><td style="text-align:center;background:#1565c0;color:#fff;font-weight:bold;">A</td></tr>
+</table>
+R=Responsible (green #2e7d32)  A=Accountable (blue #1565c0)  C=Consulted (orange #ef6c00)  I=Informed (gray #757575)
+
+=== COST TABLE (budget, pricing, financials) ===
+Trigger: "cost", "budget", "pricing", "financials"
+<table style="width:100%;border-collapse:collapse;font-size:14px;">
+  <tr><th style="background:${ac};color:#fff;padding:8px;text-align:left;">Item</th><th style="background:${ac};color:#fff;padding:8px;">Qty</th><th style="background:${ac};color:#fff;padding:8px;">Unit</th><th style="background:${ac};color:#fff;padding:8px;text-align:right;">Total</th></tr>
+  <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Item A</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;">10</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;">$500</td><td style="text-align:right;padding:6px;border-bottom:1px solid ${c}33;">$5,000</td></tr>
+  <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Item B</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;">3</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;">$2,000</td><td style="text-align:right;padding:6px;border-bottom:1px solid ${c}33;">$6,000</td></tr>
+  <tr><td colspan="3" style="padding:8px;font-weight:bold;color:${ac};text-align:right;font-size:20px;">Grand Total:</td><td style="padding:8px;font-weight:bold;color:${ac};text-align:right;font-size:20px;">$11,000</td></tr>
+</table>
+
+=== SWOT ANALYSIS (strategic planning) ===
+Trigger: "SWOT", "strengths weaknesses", "strategic"
+Use a 2x2 CSS Grid:
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:20px;">
+  <div style="background:#2e7d3244;padding:16px;border-radius:8px;border-left:4px solid #2e7d32;">
+    <h3 style="color:#2e7d32;margin-bottom:8px;">STRENGTHS</h3>
+    <ul style="font-size:14px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Point one</li><li>&#8226; Point two</li></ul>
+  </div>
+  <div style="background:#ef6c0044;padding:16px;border-radius:8px;border-left:4px solid #ef6c00;">
+    <h3 style="color:#ef6c00;margin-bottom:8px;">WEAKNESSES</h3>
+    <ul style="font-size:14px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Point one</li><li>&#8226; Point two</li></ul>
+  </div>
+  <div style="background:#1565c044;padding:16px;border-radius:8px;border-left:4px solid #1565c0;">
+    <h3 style="color:#1565c0;margin-bottom:8px;">OPPORTUNITIES</h3>
+    <ul style="font-size:14px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Point one</li><li>&#8226; Point two</li></ul>
+  </div>
+  <div style="background:#b71c1c44;padding:16px;border-radius:8px;border-left:4px solid #b71c1c;">
+    <h3 style="color:#ef5350;margin-bottom:8px;">THREATS</h3>
+    <ul style="font-size:14px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Point one</li><li>&#8226; Point two</li></ul>
+  </div>
+</div>
+
+=== KPI DASHBOARD (metrics, stats, numbers at a glance) ===
+Trigger: "KPI", "dashboard", "metrics", "stats", "numbers"
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:40px;">
+  <div style="text-align:center;background:${bg};padding:24px 12px;border-radius:10px;border:1px solid ${c}33;">
+    <div style="font-size:36px;font-weight:bold;color:${ac};">$4.2M</div>
+    <div style="font-size:13px;color:${c};margin-top:4px;">Revenue</div>
+    <div style="font-size:12px;color:#66bb6a;">+18% YoY</div>
+  </div>
+  <div style="text-align:center;background:${bg};padding:24px 12px;border-radius:10px;border:1px solid ${c}33;">
+    <div style="font-size:36px;font-weight:bold;color:${ac};">124K</div>
+    <div style="font-size:13px;color:${c};margin-top:4px;">Users</div>
+    <div style="font-size:12px;color:#66bb6a;">+24% YoY</div>
+  </div>
+  <div style="text-align:center;background:${bg};padding:24px 12px;border-radius:10px;border:1px solid ${c}33;">
+    <div style="font-size:36px;font-weight:bold;color:${ac};">3.8%</div>
+    <div style="font-size:13px;color:${c};margin-top:4px;">Conversion</div>
+    <div style="font-size:12px;color:#66bb6a;">+0.5pp</div>
+  </div>
+  <div style="text-align:center;background:${bg};padding:24px 12px;border-radius:10px;border:1px solid ${c}33;">
+    <div style="font-size:36px;font-weight:bold;color:${ac};">2.1%</div>
+    <div style="font-size:13px;color:${c};margin-top:4px;">Churn</div>
+    <div style="font-size:12px;color:#ef5350;">+0.3pp</div>
+  </div>
+</div>
+
+=== ORG CHART (team structure, reporting) ===
+Trigger: "org chart", "organization", "reporting structure", "hierarchy"
+<div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px;">
+  <div style="background:${ac};color:#fff;padding:12px 28px;border-radius:8px;font-size:16px;font-weight:bold;">CEO</div>
+  <svg width="240" height="24"><line x1="120" y1="0" x2="120" y2="24" stroke="${c}" stroke-width="1"/></svg>
+  <div style="display:flex;gap:40px;">
+    <div style="text-align:center;">
+      <svg width="120" height="24"><line x1="60" y1="0" x2="60" y2="24" stroke="${c}" stroke-width="1"/></svg>
+      <div style="background:${ac}88;color:${c};padding:8px 18px;border-radius:6px;font-size:14px;">CTO</div>
+    </div>
+    <div style="text-align:center;">
+      <svg width="120" height="24"><line x1="60" y1="0" x2="60" y2="24" stroke="${c}" stroke-width="1"/></svg>
+      <div style="background:${ac}88;color:${c};padding:8px 18px;border-radius:6px;font-size:14px;">CFO</div>
+    </div>
+  </div>
+</div>
+
+=== QUAD CHART (2x2 comparison) ===
+Trigger: "quad chart", "quadrant", "2x2"
+<div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;flex:1;padding:12px 8px 8px;">
+  <div style="padding:14px;background:${bg};border:1px solid ${c}33;">
+    <h3 style="color:${ac};font-size:16px;margin-bottom:6px;">PROBLEM</h3>
+    <ul style="font-size:13px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Key point</li><li>&#8226; Key point</li></ul>
+  </div>
+  <div style="padding:14px;background:${bg};border:1px solid ${c}33;">
+    <h3 style="color:${ac};font-size:16px;margin-bottom:6px;">SOLUTION</h3>
+    <ul style="font-size:13px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Key point</li><li>&#8226; Key point</li></ul>
+  </div>
+  <div style="padding:14px;background:${bg};border:1px solid ${c}33;">
+    <h3 style="color:${ac};font-size:16px;margin-bottom:6px;">BENEFITS</h3>
+    <ul style="font-size:13px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Key point</li><li>&#8226; Key point</li></ul>
+  </div>
+  <div style="padding:14px;background:${bg};border:1px solid ${c}33;">
+    <h3 style="color:${ac};font-size:16px;margin-bottom:6px;">NEXT STEPS</h3>
+    <ul style="font-size:13px;line-height:1.7;list-style:none;padding:0;"><li>&#8226; Key point</li><li>&#8226; Key point</li></ul>
+  </div>
+</div>
+
+=== COMPARISON TABLE (vs, alternatives, features) ===
+Trigger: "vs", "compare", "comparison", "alternatives", "feature table"
+<table style="width:100%;border-collapse:collapse;font-size:14px;">
+  <tr><th style="background:${ac};color:#fff;padding:8px;text-align:left;">Feature</th><th style="background:${ac};color:#fff;padding:8px;">Option A</th><th style="background:${ac};color:#fff;padding:8px;">Option B</th></tr>
+  <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Feature 1</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#66bb6a;">&#10003;</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#ef5350;">&#10007;</td></tr>
+  <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Feature 2</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#ef5350;">&#10007;</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#66bb6a;">&#10003;</td></tr>
+</table>
 
 CONTENT RULES:
-- Slides must be concise and scannable (max 6-7 lines of text per slide).
-- Prioritize visuals + headlines over walls of text.
-- Use bold years/events, short powerful bullets, and clear visual hierarchy.
-- Automatically create logical flow (title, agenda, content slides, summary).
-- Add a small footer with slide number and presentation title on every slide (except title slide) for professionalism.
-
-═══════════════════════════════════════════
-GOVERNMENT BID MODE (auto-detect)
-═══════════════════════════════════════════
-Activate this mode automatically when the user mentions any of: "gov bid", "government proposal", "compact bid", "quad chart", "limited slides", "proposal", or any government/defense/military bidding context.
-
-When GOVERNMENT BID MODE is active:
-- SLIDE COUNT IS USER-SETTABLE. Default maximum is 5 slides.
-- If the user has NOT already specified a slide count in their request, you MUST ask FIRST before generating:
-  "How many slides/pages are allowed for this government bid deck? (default is 5)"
-- If the user HAS already specified a number (e.g. "8 slides", "max 4 pages", "no more than 10"), use that number and do NOT ask again.
-- Always respect the user-provided or default maximum. Do not exceed it.
-- Extreme conciseness: maximum 4 short bullets per slide, large readable fonts, heavy visuals/icons, minimal text.
-- Dense but scannable: perfect for government reviewers who hate wordy decks.
-- Override theme to government-contractor style unless user specifies otherwise:
-  --bg:#0a2342; --text:#ffffff; --accent:#00b4d8; --h1:#ffffff; --h2:#7eb8e6;
-  Use dark navy backgrounds, clean white text, strong contrast, no decorative flourishes.
-- Automatically suggest and include Gantt, RACI, and Costing slides where they make sense for the topic.
-- All chart slides must be extremely concise and scannable with government-friendly styling.
-- If in SCRIPT or MARKDOWN mode, the outline step must ask: "Would you like to include a Gantt chart, RACI matrix, or costing slide?"
-
-═══════════════════════════════════════════
-QUAD CHART (special slide type)
-═══════════════════════════════════════════
-When the user asks for a "quad chart", "quadrant chart", or includes "quad" in the request, create a single professional quad chart slide using CSS Grid.
-
-QUAD CHART LAYOUT RULES:
-- Title centered at the top in large bold font.
-- Content area divided into exactly 4 equal quadrants using CSS Grid (2x2).
-- Label each quadrant clearly in the top-left corner with a bold header.
-- Each quadrant: one bold title + max 3-4 very short bullets or key phrases + optional small inline SVG icon.
-- Use subtle borders and background shading to separate the four quadrants cleanly.
-- Professional, military/government-friendly style: clean lines, high contrast, no fluff.
-- Must still use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
-
-Default Quad Chart quadrants (use unless user specifies different ones):
-1. Top-Left:     PROBLEM / REQUIREMENT
-2. Top-Right:    SOLUTION / APPROACH
-3. Bottom-Left:  BENEFITS / VALUE
-4. Bottom-Right: TIMELINE / COST / NEXT STEPS
-
-QUAD CHART CSS TEMPLATE:
-body { display:flex; flex-direction:column; width:960px; height:540px; }
-.header { text-align:center; padding:12px; }
-.grid { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; gap:2px; flex:1; padding:0 8px 8px; }
-.quad { padding:16px; background:var(--bg-secondary); border:1px solid var(--border); }
-.quad h3 { font-size:16px; margin-bottom:8px; color:var(--accent); }
-.quad li { font-size:13px; line-height:1.6; }
-
-Allow the user to override quadrant titles or color scheme on any quad chart request.
-
-═══════════════════════════════════════════
-GANTT CHART SLIDE (auto-detect)
-═══════════════════════════════════════════
-Trigger words: "Gantt", "project schedule", "timeline", "milestone schedule", "project plan"
-When ANY of these appear in the user request, generate a professional Gantt chart slide.
-
-GANTT CHART LAYOUT RULES:
-- Use inline SVG for a clean horizontal Gantt chart.
-- Left column: Task names (bold, left-aligned, ~220px wide)
-- Top: Time scale header (months or weeks, auto-scaled to fit)
-- Bars: colored <rect> elements with rx="4" for rounded corners. Use different colors per phase.
-- If user provides dependencies, add simple arrow lines between bars.
-- Footer: "Project Timeline" text + slide number
-- User data format: bullet list with | separators, e.g.:
-  - Task 1 | 2026-06 | 2026-08 | blue
-  - Task 2 | 2026-07 | 2026-09 | purple
-- If user provides plain English, intelligently extract tasks and create realistic data.
-- Must use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
-
-GANTT CSS/SVG TEMPLATE:
-body { display:flex; flex-direction:column; width:960px; height:540px; font-family:'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
-.header { padding:12px 20px; }
-.gantt { flex:1; position:relative; padding:0 20px 10px; }
-svg { width:100%; height:100%; }
-
-═══════════════════════════════════════════
-RACI / WORK ASSIGNMENT SLIDE (auto-detect)
-═══════════════════════════════════════════
-Trigger words: "RACI", "responsibility matrix", "work assignments", "team roles", "org chart", "who does what"
-When ANY of these appear, generate a professional RACI matrix slide.
-
-RACI LAYOUT RULES:
-- CSS Grid or HTML <table> styled as a professional matrix.
-- Rows = Tasks/Deliverables. Columns = Team members or roles.
-- Cells contain one letter, colored and styled:
-  R = Responsible (green background, bold)
-  A = Accountable (blue background, bold)
-  C = Consulted (orange background)
-  I = Informed (gray background, muted)
-- Clean borders, bold headers, high contrast.
-- Use the classic 4-column RACI format unless user specifies otherwise.
-- Must use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
-
-RACI CSS TEMPLATE:
-body { display:flex; flex-direction:column; width:960px; height:540px; font-family:'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
-.header { padding:12px 20px; }
-.matrix { flex:1; overflow:auto; }
-table { width:100%; border-collapse:collapse; font-size:13px; }
-th { background:var(--accent); color:#fff; padding:8px 12px; text-align:center; }
-td { padding:6px 10px; border:1px solid var(--border); text-align:center; }
-.r { background:#2e7d32; color:#fff; font-weight:bold; }
-.a { background:#1565c0; color:#fff; font-weight:bold; }
-.c { background:#ef6c00; color:#fff; }
-.i { background:#757575; color:#fff; }
-
-═══════════════════════════════════════════
-COSTING / BUDGET SLIDE (auto-detect)
-═══════════════════════════════════════════
-Trigger words: "cost", "budget", "pricing", "financials", "cost breakdown", "pricing table"
-When ANY of these appear, generate a professional costing/budget slide.
-
-COSTING LAYOUT RULES:
-- Left side (60%): Detailed cost table with columns: Item | Quantity | Unit Cost | Total
-- Right side (40%): Inline SVG pie chart or horizontal bar chart showing cost breakdown
-- Each pie slice or bar is color-coded to match its row in the table.
-- Bottom: Grand total in large bold font using --accent color.
-- User can provide data as markdown table, or the AI creates realistic estimates from context.
-- Must use <<<SLIDE>>> / <<<END_SLIDE>>> markers and 960x540 dimensions.
-
-COSTING CSS/SVG TEMPLATE:
-body { display:flex; flex-direction:column; width:960px; height:540px; font-family:'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
-.header { padding:12px 20px; }
-.content { display:flex; flex:1; gap:20px; padding:0 20px; }
-.table-side { flex:3; }
-.chart-side { flex:2; display:flex; align-items:center; justify-content:center; }
-table { width:100%; border-collapse:collapse; font-size:13px; }
-th { background:var(--accent); color:#fff; padding:6px 10px; text-align:left; }
-td { padding:5px 10px; border-bottom:1px solid var(--border); }
-.total { font-size:22px; font-weight:bold; color:var(--accent); text-align:right; padding:8px 20px; }
-
-═══════════════════════════════════════════
-PPTX EXPORT MODE (auto-detect)
-═══════════════════════════════════════════
-Activate this mode automatically when the user mentions ANY of: "pptx", "powerpoint", "convert to pptx", "export to pptx", "ppt", "not converting well", or "pptx friendly".
-Also activate when the user says "PPTX_EXPORT_MODE".
-Also activate whenever the user indicates they will export to PowerPoint or need PPTX-compatible slides, UNLESS they specifically say "keep beautiful HTML only".
-
-When PPTX EXPORT MODE is active, apply these OVERRIDES to all slide generation:
-
-1. LAYOUT: Use ONLY absolute positioning (position:absolute with top/left/width/height in pixels). NO flexbox, NO CSS Grid, NO display:flex, NO display:grid.
-2. BODY: Exactly width:960px; height:540px; position:relative; overflow:hidden;
-3. FONTS: Use ONLY Arial, Calibri, or 'Segoe UI'. No other font families.
-4. ELEMENTS: Use only basic <div>, <table>, <tr>, <td>, <h1>-<h6>, <p>, <ul>, <li>, <span>, <b>, <i>, <hr>, and inline <svg>. No <section>, <article>, <figure>, <figcaption>, or other semantic elements.
-5. COLORS: Keep colors simple — solid fills only. NO linear-gradient, NO radial-gradient, NO background-blend-mode. Use the theme CSS variables or simple hex colors.
-6. SVG: All charts (Gantt, RACI, Costing, Quad) must still render but use SIMPLER SVG code — basic <rect>, <line>, <text>, <circle>, <path> elements only. No SVG filters, no clip-path, no mask.
-7. INVISIBLE MARKER: Add this exact comment at the very top of EVERY <style> tag:
-/* PPTX_EXPORT_FRIENDLY: absolute layout, simple elements, no flex/grid */
-8. SLIDE FOOTER: Add a small footer div on every slide (except title slide) with slide number and presentation title, absolutely positioned at bottom.
-9. When PPTX_EXPORT MODE + GOVERNMENT BID MODE are both active:
-   - Still enforce the user-settable slide maximum (default 5)
-   - Use the government palette (--bg:#0a2342; --text:#ffffff; --accent:#00b4d8)
-   - Every slide must have the corporate-sensitive footer
-   - All charts must use the simple SVG approach above
-
-PPTX_EXPORT FRIENDLY TEMPLATE (use when this mode is active):
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-/* PPTX_EXPORT_FRIENDLY: absolute layout, simple elements, no flex/grid */
-* { margin:0; padding:0; box-sizing:border-box; }
-body { width:960px; height:540px; position:relative; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); }
-.title { position:absolute; top:30px; left:40px; width:880px; font-size:36px; font-weight:bold; color:var(--h1); }
-.content { position:absolute; top:100px; left:40px; width:880px; height:380px; }
-.footer { position:absolute; bottom:8px; right:20px; font-size:10px; color:var(--text); opacity:0.5; }
-</style>
-</head>
-<body>
-<div class="title">Slide Title Here</div>
-<div class="content">
-  <p style="font-size:20px; margin-bottom:12px;">Content goes here</p>
-  <ul style="font-size:16px; line-height:1.8;">
-    <li>Bullet point one</li>
-    <li>Bullet point two</li>
-  </ul>
-</div>
-<div class="footer">Slide 2 | Presentation Title</div>
-</body>
-</html>`;
+- Max 6-7 lines per slide. Big fonts (16-24px for body, 28-48px for headings).
+- Logical flow: title slide -> agenda/overview -> content slides -> summary.
+- Small footer on every content slide: "Slide N | Title" at bottom-right.
+- Use meaningful content, never lorem ipsum.`;
 
         if (mode === 'script') {
-            return basePrompt + `
-
-MODE: SCRIPT
-First output a brief numbered outline like this:
-1. [Slide Title]
-2. [Slide Title]
-3. [Slide Title]
-...
-
-Then generate each slide wrapped in <<<SLIDE>>> / <<<END_SLIDE>>> markers. No commentary between slides.`;
+            return basePrompt + '\n\nMODE: SCRIPT\nFirst output a numbered outline (1. Title, 2. Title...), then output all <<<SLIDE>>> blocks.';
         } else if (mode === 'markdown') {
-            return basePrompt + `
-
-MODE: MARKDOWN
-First output the full deck in clean markdown with ---SLIDE--- separators:
-
----SLIDE---
-# Slide Title Here
-- Key point one
-- Key point two
----SLIDE---
-## Second Slide Title
-Content here
----SLIDE---
-
-Then output ALL slides as complete HTML wrapped in <<<SLIDE>>> / <<<END_SLIDE>>> markers.`;
+            return basePrompt + '\n\nMODE: MARKDOWN\nFirst output the deck with ---SLIDE--- separators in markdown, then output all <<<SLIDE>>> blocks.';
         } else {
-            return basePrompt + `
-
-MODE: SLIDES
-Generate complete slide HTML documents directly. Output ONLY <<<SLIDE>>>/<<<END_SLIDE>>> blocks.`;
+            return basePrompt + '\n\nMODE: SLIDES\nGenerate slide HTML blocks directly. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks.';
         }
     }
 
     function getEditSystemPrompt() {
-        const theme = SLIDE_THEMES[state.currentTheme];
-        const cssVars = `--bg:${theme.background};--text:${theme.color};--accent:${theme.accent};--h1:${theme.h1Color};--h2:${theme.h2Color};`;
-        return `You are editing an existing presentation slide. The user wants a specific change.
-
-RULES (NEVER BREAK THESE):
-1. Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head> with <style>, and <body>.
-2. ALL CSS must be in a <style> tag. No external resources. No JavaScript.
-3. Current theme CSS variables: ${cssVars}
-4. Keep the slide at 960x540 (16:9) with width:960px; height:540px; on body.
-5. Wrap the ENTIRE modified slide in <<<SLIDE>>> / <<<END_SLIDE>>> markers, each on its own line.
-6. Output ONLY the <<<SLIDE>>>/<<<END_SLIDE>>> wrapped HTML. No explanations, no markdown, no code blocks.
-7. Make ONLY the changes the user requested. Preserve everything else exactly as-is.`;
+        const t = SLIDE_THEMES[state.currentTheme];
+        return 'You are editing a presentation slide. The user wants a specific change.\n\n' +
+            'RULES:\n' +
+            '1. Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head> with <style>, and <body>.\n' +
+            '2. All CSS in a single <style> tag. No external links, no JavaScript.\n' +
+            '3. Current theme colors for reference: background=' + t.background + ' text=' + t.color + ' accent=' + t.accent + '\n' +
+            '4. 960x540 pixels. body { width:960px; height:540px; overflow:hidden; }\n' +
+            '5. Wrap the slide in <<<SLIDE>>> / <<<END_SLIDE>>> markers.\n' +
+            '6. Output ONLY the markers and HTML. No explanations.\n' +
+            '7. Make ONLY the requested changes. Keep everything else exactly as-is.\n' +
+            '8. Slide must be under 3000 characters.';
     }
 
     function parseSlidesFromResponse(response) {
@@ -1231,13 +1262,10 @@ RULES (NEVER BREAK THESE):
         });
     }
 
-    function archiveCurrentSession() {
-        saveCurrentSession();
-        const session = state.sessions.find(s => s.id === state.currentSessionId);
+    function togglePinSession(sessionId) {
+        const session = state.sessions.find(function (s) { return s.id === sessionId; });
         if (!session) return;
-        const isDefault = (session.slides.length === 1 && session.slides[0] === DEFAULT_SLIDE_HTML);
-        if (isDefault) return;
-        session.archived = true;
+        session.pinned = !session.pinned;
         saveSessions();
         renderSessionList();
     }
@@ -1283,8 +1311,13 @@ body { background: #111; overflow: hidden; }
         const isDefault = (state.slides.length === 1 && state.slides[0] === DEFAULT_SLIDE_HTML);
 
         if (!isDefault && state.slides.length > 0) {
-            archiveCurrentSession();
-            const newTitle = prompt.length > 50 ? prompt.substring(0, 50) + '...' : prompt;
+            saveCurrentSession();
+            var currentSess = state.sessions.find(function (s) { return s.id === state.currentSessionId; });
+            if (currentSess && !currentSess.pinned) {
+                currentSess.pinned = true;
+                saveSessions();
+            }
+            var newTitle = prompt.length > 50 ? prompt.substring(0, 50) + '...' : prompt;
             createSession(newTitle);
         }
 
@@ -1626,17 +1659,54 @@ body { background: #111; overflow: hidden; }
 
     function importContent(content, sourceType, replaceAll) {
         let newSlides = [];
+        let newTheme = null;
 
-        if (sourceType === 'template-json' || sourceType === 'auto') {
+        var isJson = (sourceType === 'template-json');
+        if (!isJson && sourceType === 'auto') {
+            isJson = /^\s*\{/.test(content) && /\}\s*$/.test(content.trim());
+        }
+
+        if (isJson) {
             try {
-                const data = JSON.parse(content);
+                var data = JSON.parse(content);
                 if (data.slides && Array.isArray(data.slides)) {
-                    newSlides = data.slides;
-                    if (data.theme) state.currentTheme = data.theme;
+                    var rawSlides = data.slides.filter(function (s) {
+                        return typeof s === 'string' && s.trim().length > 0;
+                    });
+                    if (rawSlides.length === 0) {
+                        addErrorMessage('Template JSON has a "slides" array but it is empty.');
+                        return;
+                    }
+                    for (var i = 0; i < rawSlides.length; i++) {
+                        if (!/<!DOCTYPE|<html|<style/i.test(rawSlides[i])) {
+                            addErrorMessage('Slide ' + (i + 1) + ' in the template does not appear to be valid HTML (missing DOCTYPE or <html>).');
+                            return;
+                        }
+                        if (rawSlides[i].length < 50) {
+                            addErrorMessage('Slide ' + (i + 1) + ' is too short (' + rawSlides[i].length + ' chars). Each slide should be a full HTML document.');
+                            return;
+                        }
+                    }
+                    newSlides = rawSlides;
+                    if (data.theme && SLIDE_THEMES[data.theme]) {
+                        newTheme = data.theme;
+                    } else if (data.theme) {
+                        addSystemMessage('Warning: Theme "' + data.theme + '" is not recognized. Using current theme. Valid themes: dark, light, blue, green, red.');
+                    }
+                } else if (data.slides && !Array.isArray(data.slides)) {
+                    addErrorMessage('Template JSON has a "slides" field but it is not an array.');
+                    return;
+                } else {
+                    addErrorMessage('Template JSON is missing a "slides" array. The JSON must have {"slides": ["<slide HTML>", ...]}.');
+                    return;
+                }
+                if (data.name && !data.slides) {
+                    addErrorMessage('Template has a "name" but no "slides" array. Did the LLM omit the slides? Check the format in the Import dialog.');
+                    return;
                 }
             } catch (e) {
                 if (sourceType === 'template-json') {
-                    addErrorMessage('Invalid template JSON file.');
+                    addErrorMessage('Invalid JSON: ' + e.message);
                     return;
                 }
             }
@@ -1660,7 +1730,7 @@ body { background: #111; overflow: hidden; }
         }
 
         if (newSlides.length === 0) {
-            addErrorMessage('Could not parse any slides from the imported content.');
+            addErrorMessage('Could not parse any slides. Supported formats: Template JSON with "slides" array, HTML documents, or Markdown with --- separators.');
             return;
         }
 
@@ -1670,10 +1740,16 @@ body { background: #111; overflow: hidden; }
             state.slides = state.slides.concat(newSlides);
         }
 
+        if (newTheme) {
+            state.currentTheme = newTheme;
+        }
+
         state.currentSlideIndex = 0;
         saveSlides();
         renderAll();
-        addSystemMessage(`Imported ${newSlides.length} slide(s).`);
+        var msg = 'Imported ' + newSlides.length + ' slide(s).';
+        if (newTheme) msg += ' Theme set to "' + newTheme + '".';
+        addSystemMessage(msg);
     }
 
     function handleExportTemplate() {
@@ -1700,12 +1776,37 @@ body { background: #111; overflow: hidden; }
         document.getElementById('sidebar-toggle-btn').addEventListener('click', () => {
             state.sidebarOpen = !state.sidebarOpen;
             document.getElementById('session-sidebar').classList.toggle('open', state.sidebarOpen);
+            localStorage.setItem('canvas_sidebar_open', state.sidebarOpen);
         });
 
         document.getElementById('new-session-btn').addEventListener('click', () => {
             saveCurrentSession();
             createSession('New Presentation');
             addSystemMessage('Started a new presentation session.');
+        });
+
+        document.getElementById('clear-sessions-btn').addEventListener('click', () => {
+            clearAllSessions();
+        });
+
+        document.getElementById('session-sidebar').addEventListener('dblclick', (e) => {
+            var titleEl = e.target.closest('.session-item-title');
+            if (!titleEl) return;
+            var item = titleEl.closest('.session-item');
+            var sessionId = item.querySelector('.session-item-pin, .session-item-download, .session-item-delete').dataset.id;
+            var session = state.sessions.find(function (s) { return s.id === sessionId; });
+            if (!session) return;
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'session-title-edit';
+            input.value = session.title;
+            input.style.cssText = 'width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--accent);padding:2px 6px;border-radius:3px;font-size:13px;font-family:inherit;';
+            titleEl.innerHTML = '';
+            titleEl.appendChild(input);
+            input.focus();
+            input.select();
+            input.addEventListener('blur', function () { finishRename(input, session); });
+            input.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); finishRename(input, session); } });
         });
 
         document.getElementById('server-info-btn').addEventListener('click', () => {
@@ -1855,6 +1956,16 @@ body { background: #111; overflow: hidden; }
             document.getElementById('import-modal').style.display = 'none';
         });
 
+        document.getElementById('copy-llm-prompt-btn').addEventListener('click', () => {
+            const pre = document.getElementById('llm-template-prompt');
+            navigator.clipboard.writeText(pre.textContent).then(() => {
+                addSystemMessage('LLM prompt copied to clipboard. Paste it into Gemini, ChatGPT, or any LLM to generate a template.');
+            }).catch(() => {
+                pre.select();
+                addSystemMessage('Prompt selected. Press Ctrl+C to copy.');
+            });
+        });
+
         document.getElementById('export-template-btn').addEventListener('click', handleExportTemplate);
 
         document.getElementById('present-btn').addEventListener('click', startPresentation);
@@ -1947,7 +2058,7 @@ body { background: #111; overflow: hidden; }
             if (!state.currentSessionId || !state.sessions.find(s => s.id === state.currentSessionId)) {
                 state.currentSessionId = state.sessions[0].id;
             }
-            const session = state.sessions.find(s => s.id === state.currentSessionId);
+            var session = state.sessions.find(s => s.id === state.currentSessionId);
             if (session) {
                 loadSessionIntoState(session);
             } else {
@@ -1958,6 +2069,8 @@ body { background: #111; overflow: hidden; }
             state.slides = [DEFAULT_SLIDE_HTML];
             state.currentSlideIndex = 0;
         }
+        state.sidebarOpen = localStorage.getItem('canvas_sidebar_open') !== 'false';
+        document.getElementById('session-sidebar').classList.toggle('open', state.sidebarOpen);
         renderAll();
         renderSessionList();
         refreshModels();
