@@ -8,10 +8,15 @@
 
 ## Why Presentation Canvas?
 
+Unlike most presentation tools that send your data to cloud servers, Presentation Canvas runs on **local models via Ollama** — your data never leaves your computer. It also works with foundational models (OpenAI, Zhipu/GLM, or any OpenAI-compatible API) when you need them. This gives you far more control over your slides than other programs: you pick the model, the theme, the layout, and every detail of the output.
+
 Government bids demand specific formats — quad charts, RACI matrices, Gantt timelines, cost breakdowns. These are painful to build by hand. Presentation Canvas generates them from a single prompt using AI.
 
+- **Privacy-first** — Runs on local models so your data never leaves your computer. No cloud, no accounts, no tracking.
+- **Built on Ollama** — First-class support for local LLMs. Works out of the box with any Ollama model.
+- **Foundation models too** — Connect to OpenAI, Zhipu (GLM), or any OpenAI-compatible endpoint when you need more power.
+- **More control than other slide programs** — You choose the theme, layout, max slides, footer labels, and every detail. The AI works for you, not the other way around.
 - **No server required** — Open `index.html` and start. All processing happens in-browser.
-- **Multi-provider AI** — Ollama (local), OpenAI, Zhipu (GLM), or any OpenAI-compatible endpoint.
 - **Government-ready slides** — Auto-detects bid/proposal keywords and enforces concise, evaluator-friendly formatting.
 - **Edit in Canvas, deliver as PDF** — Create here, export PDF for submission or PPTX for live briefings.
 - **Session history** — Every presentation auto-archived. Switch between decks instantly.
