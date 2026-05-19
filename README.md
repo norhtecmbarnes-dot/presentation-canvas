@@ -2,53 +2,63 @@
 
 **AI-powered slide builder for government proposals, business pitches, and professional presentations.**
 
-Presentation Canvas solves a specific problem: building complex, visually compelling presentation slides that government evaluators love — fast. It uses AI to generate complete slide decks with proper formatting, color schemes, and specialized slide types that government bids require.
-
-![Version](https://img.shields.io/badge/version-2.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-green)
+![Version](https://img.shields.io/badge/version-2.1-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple)
 
 ---
 
 ## Why Presentation Canvas?
 
-- **Government bids demand specific formats** — Quad charts, RACI matrices, Gantt timelines, cost breakdowns. These are painful to build by hand. Presentation Canvas generates them from a single prompt.
-- **Color schemes matter** — Bad colors kill credibility. Every theme is designed for high contrast, readability, and professional appearance on projectors and printed handouts.
-- **Beautiful and simple** — No bloat. No account required. No server. Open `index.html` and start.
-- **AI does the work** — Describe what you need. The AI writes the content, designs the layout, and produces complete slides. You review and refine.
-- **Edit in Canvas, deliver as PDF** — Create here, export PDF for government submission, export PPTX for live briefings.
+Government bids demand specific formats — quad charts, RACI matrices, Gantt timelines, cost breakdowns. These are painful to build by hand. Presentation Canvas generates them from a single prompt using AI.
+
+- **No server required** — Open `index.html` and start. All processing happens in-browser.
+- **Multi-provider AI** — Ollama (local), OpenAI, Zhipu (GLM), or any OpenAI-compatible endpoint.
+- **Government-ready slides** — Auto-detects bid/proposal keywords and enforces concise, evaluator-friendly formatting.
+- **Edit in Canvas, deliver as PDF** — Create here, export PDF for submission or PPTX for live briefings.
+- **Session history** — Every presentation auto-archived. Switch between decks instantly.
 
 ---
 
 ## Features
 
 ### Core
+
 - **Multi-Provider LLM** — Ollama (local), OpenAI, Zhipu (GLM), or any OpenAI-compatible API
 - **Three Generation Modes** — Script, Slides, or Markdown
 - **Edit Mode** — AI-powered edits on individual slides
 - **Preview / HTML Toggle** — Rendered view or raw HTML editing
-- **5 Professional Themes** — Dark, Light, Blue, Green, Red
+- **5 Professional Themes** — Dark, Light, Blue, Green, Red (applies live to all slides)
+- **7 Built-in Layouts** — Title, Title+Content, Two Column, Image Left/Right, Full Image, Blank
 
 ### Government & Business
-- **Government Bid Mode** — Auto-activates on keywords like "gov bid", "proposal", "compact bid". Enforces concise slides, professional styling, and ask-first slide count (default 5).
-- **Quad Chart** — Triggered by "quad chart" or "quadrant chart". Generates a 2x2 matrix with titled quadrants (Problem/Solution/Benefits/Timeline by default).
-- **Gantt Chart** — Triggered by "Gantt", "timeline", "project schedule". Inline SVG horizontal Gantt bars with task names and time scales.
-- **RACI Matrix** — Triggered by "RACI", "responsibility matrix", "work assignments". Color-coded R/A/C/I cells in a professional table.
-- **Costing / Budget** — Triggered by "cost", "budget", "pricing", "financials". Split table + SVG pie/bar chart with grand total.
-- **PPTX Export Mode** — Auto-activates on "pptx", "powerpoint", "export to pptx". Simplified HTML layout using absolute positioning for converter compatibility.
+
+| Keyword | Mode | Behavior |
+|---------|------|----------|
+| "gov bid", "proposal", "compact bid" | Government Bid | Asks for max slide count (default 5), concise bullets, professional styling |
+| "quad chart", "quadrant chart" | Quad Chart | 2×2 matrix with titled quadrants |
+| "Gantt", "timeline", "project schedule" | Gantt Chart | Inline SVG horizontal bar chart |
+| "RACI", "responsibility matrix" | RACI Matrix | Color-coded responsibility assignment table |
+| "cost", "budget", "pricing" | Costing | Split table + pie/bar chart with grand total |
+| "pptx", "powerpoint" | PPTX Export | Simplified absolute-positioned HTML for converter |
 
 ### Session & Organization
-- **Session History** — Auto-archives previous presentations in the sidebar. Switch between sessions instantly.
-- **HTML Download** — Download any session as a viewer HTML file with all slides.
-- **Logo System** — Upload a logo, pick position (corner), pick size, apply to all slides with one click.
-- **Image Upload** — Upload images, insert into specific slides with "To Slide N" button.
+
+- **Session Sidebar** — Auto-archives previous presentations. Switch between decks instantly. Sidebar opens by default.
+- **Max Slides** — Number input in the mode bar controls deck length before generation.
+- **Footer Label** — Add "CUI", "Company Sensitive", "Do Not Distribute" labels to every slide.
+- **Logo System** — Upload once, pick position and size, apply to all slides with one click.
+- **Image Upload** — Upload images and insert into specific slides with "To Slide N" button.
+- **HTML Download** — Download any session as a standalone viewer HTML file.
 
 ### Export
+
 - **PDF** — Print-optimized with landscape layout and background color support
-- **PPTX** — Each slide rendered as a high-fidelity image in a PowerPoint deck. Ready for live presentations.
+- **PPTX** — Each slide rendered as a high-fidelity image inside a PowerPoint deck. Full visual fidelity, not text-editable.
 - **Template Import/Export** — JSON, HTML, Markdown, or clipboard
 
 ### Presentation
-- **Full-screen Mode** — Keyboard navigation, on-screen controls
-- **7 Built-in Layouts** — Title, Title+Content, Two Column, Image Left/Right, Full Image, Blank
+
+- **Full-screen Mode** — Keyboard navigation with arrow keys, spacebar, and escape
+- **Streamed Generation** — Slides appear one at a time as the AI generates them
 
 ---
 
@@ -57,14 +67,14 @@ Presentation Canvas solves a specific problem: building complex, visually compel
 ### 1. Prerequisites
 
 - A modern browser (Chrome, Firefox, Edge)
-- **For local AI:** [Ollama](https://ollama.com) installed with a model
+- **For local AI:** [Ollama](https://ollama.com) installed with a model pulled
 
-### 2. Install Ollama (local models)
+### 2. Pull a Model (Ollama)
 
 ```bash
 ollama pull llama3      # General purpose
-ollama pull mistral      # Fast, capable
-ollama pull glm4         # Excellent for structured output
+ollama pull mistral     # Fast, capable
+ollama pull glm4        # Excellent for structured output
 ```
 
 ### 3. Launch
@@ -100,18 +110,25 @@ python -m http.server 8080
 
 1. Choose **Generate** mode
 2. Pick **Script**, **Slides**, or **Markdown** format
-3. Type your request:
-   - "Create a 5-slide government bid deck for a cybersecurity contract"
-   - "Make a quad chart for our cloud migration proposal"
-   - "Build a Gantt chart slide for project timeline Q3-Q4"
-   - "Generate a RACI matrix for the development team"
-4. Slides stream in one at a time as the AI generates them
+3. Set **Max Slides** if you want to limit the deck length
+4. Type your request:
+   - *"Create a 5-slide government bid deck for a cybersecurity contract"*
+   - *"Make a quad chart for our cloud migration proposal"*
+   - *"Build a Gantt chart slide for project timeline Q3-Q4"*
+   - *"Generate a RACI matrix for the development team"*
+5. Slides stream in one at a time as the AI generates them
 
 ### Edit a Slide
 
 1. Switch to **Edit** mode
 2. Select the slide
-3. Describe changes: "Add a cost breakdown table", "Change background to navy blue", "Make the title larger"
+3. Describe changes: *"Add a cost breakdown table"*, *"Change background to navy blue"*, *"Make the title larger"*
+
+### Apply a Theme
+
+1. Select a theme from the **Theme** dropdown (Dark, Light, Blue, Green, Red)
+2. All existing slides update immediately
+3. The theme also informs the AI when generating new slides
 
 ### Logo
 
@@ -121,24 +138,15 @@ python -m http.server 8080
 4. Click **Apply** — logo appears on every slide
 5. Click **Remove** to strip it from all slides
 
+### Footer Labels
+
+Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive", "Do Not Distribute"). The label is included in every generated slide footer.
+
 ### Export
 
 - **PDF** — Click Export > PDF. Set margins to "None" and enable "Background Graphics" for dark themes.
 - **PPTX** — Click Export > PPTX. Each slide becomes a high-res image in the PowerPoint deck. Use for live presentations, not for text editing.
 - **HTML** — Click the download arrow on any session in the sidebar.
-
----
-
-## Special Modes Reference
-
-| Keyword | Mode Activated | Behavior |
-|---------|---------------|----------|
-| "gov bid", "proposal", "compact bid" | Government Bid | Max slides (asks user, default 5), concise bullets, navy/white theme, suggests quad/Gantt/RACI |
-| "quad chart", "quadrant chart" | Quad Chart | 2x2 matrix slide with labeled quadrants |
-| "Gantt", "timeline", "project schedule" | Gantt Chart | Inline SVG horizontal bar chart |
-| "RACI", "responsibility matrix" | RACI Matrix | Color-coded responsibility table |
-| "cost", "budget", "pricing" | Costing | Split table + chart with grand total |
-| "pptx", "powerpoint", "ppt" | PPTX Export | Simplified absolute-positioned HTML for converter compatibility |
 
 ---
 
@@ -174,6 +182,7 @@ canvas/
 |---------|----------|
 | Ollama models not loading | Run `ollama serve`, check URL in Settings, click Refresh |
 | Slides not generating | Verify model is selected, try a different generation mode |
+| Theme not applying to slides | Select theme from dropdown — it updates all existing slides live |
 | CORS errors with custom APIs | Endpoint must support CORS headers, or use a proxy |
 | Dark theme not showing in PDF | Enable "Background Graphics" in browser print dialog |
 | PPTX looks wrong | PPTX exports slides as images — edit in Canvas, not PowerPoint |
