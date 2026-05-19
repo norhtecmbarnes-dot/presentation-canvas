@@ -362,14 +362,12 @@ p { font-size: 24px; color: #a0a0b0; }
 
         const slideHtml = state.slides[state.currentSlideIndex] || DEFAULT_SLIDE_HTML;
 
-        let existingIframe = previewArea.querySelector('iframe');
-        if (!existingIframe) {
-            previewArea.innerHTML = '';
-            existingIframe = document.createElement('iframe');
-            existingIframe.sandbox = 'allow-scripts allow-same-origin';
-            previewArea.appendChild(existingIframe);
-        }
-        existingIframe.srcdoc = slideHtml;
+        // Always rebuild the iframe to clear previous content
+        previewArea.innerHTML = '';
+        const iframe = document.createElement('iframe');
+        iframe.sandbox = 'allow-scripts allow-same-origin';
+        previewArea.appendChild(iframe);
+        iframe.srcdoc = slideHtml;
         htmlEditor.value = slideHtml;
     }
 
