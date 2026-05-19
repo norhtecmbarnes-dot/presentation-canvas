@@ -9,7 +9,7 @@ body { display: flex; align-items: center; justify-content: center; min-height: 
 h1 { font-size: 48px; margin-bottom: 16px; color: #ffffff; }
 p { font-size: 24px; color: #a0a0b0; }
 </style></head><body>
-<div class="container"><h1>Canvas</h1><p>Describe your presentation in the chat panel to get started.</p></div>
+<div class="container"><h1>Presentation Canvas</h1><p>Describe your presentation in the chat panel to get started.</p></div>
 </body></html>`;
 
     const SLIDE_THEMES = {
@@ -1612,7 +1612,7 @@ body { background: #111; overflow: hidden; }
         const title = document.getElementById('presentation-title').value || 'My Template';
         const template = {
             name: title,
-            description: `Exported from Canvas on ${new Date().toLocaleDateString()}`,
+            description: `Exported from Presentation Canvas on ${new Date().toLocaleDateString()}`,
             theme: state.currentTheme,
             slides: state.slides
         };
@@ -1893,7 +1893,7 @@ body { background: #111; overflow: hidden; }
         setMode('generate');
         renderTemplateButtons();
         loadExternalTemplates();
-        addSystemMessage('Welcome to Canvas! Select a model and describe your presentation, or choose a template.');
+        addSystemMessage('Welcome to Presentation Canvas! Select a model and describe your presentation, or choose a template.');
     }
 
     window.addEventListener('DOMContentLoaded', init);

@@ -1,141 +1,146 @@
-# Canvas - AI Presentation Generator
+# Presentation Canvas
 
-A local-first AI-powered presentation builder that runs entirely in your browser. Create, edit, and export slides using local or cloud LLMs.
+**AI-powered slide builder for government proposals, business pitches, and professional presentations.**
 
-![Canvas](https://img.shields.io/badge/version-1.0-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+Presentation Canvas solves a specific problem: building complex, visually compelling presentation slides that government evaluators love — fast. It uses AI to generate complete slide decks with proper formatting, color schemes, and specialized slide types that government bids require.
+
+![Version](https://img.shields.io/badge/version-2.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-green)
+
+---
+
+## Why Presentation Canvas?
+
+- **Government bids demand specific formats** — Quad charts, RACI matrices, Gantt timelines, cost breakdowns. These are painful to build by hand. Presentation Canvas generates them from a single prompt.
+- **Color schemes matter** — Bad colors kill credibility. Every theme is designed for high contrast, readability, and professional appearance on projectors and printed handouts.
+- **Beautiful and simple** — No bloat. No account required. No server. Open `index.html` and start.
+- **AI does the work** — Describe what you need. The AI writes the content, designs the layout, and produces complete slides. You review and refine.
+- **Edit in Canvas, deliver as PDF** — Create here, export PDF for government submission, export PPTX for live briefings.
+
+---
 
 ## Features
 
-- **Multi-Provider LLM Support** — Connect to Ollama (local), OpenAI, Zhipu (GLM), or any OpenAI-compatible API
-- **Three Generation Modes**
-  - **Script** — AI writes a full presentation script, then generates slides from it
-  - **Slides** — AI creates slides directly
-  - **Markdown** — AI generates markdown-formatted slides
-- **Slide Edit Mode** — After generating, switch to Edit mode to request LLM-powered changes to individual slides
-- **Preview / HTML Toggle** — View rendered slides or edit raw HTML directly
-- **Built-in Templates** — Business Pitch, Tech Overview, Education, Photo Gallery, and more
-- **Template Import/Export** — Import from JSON template files, HTML files, or Markdown; export your slides as reusable templates
-- **Image Upload** — Upload images and embed them directly into slides
-- **5 Themes** — Dark, Light, Blue, Green, Red
-- **7 Slide Layouts** — Title, Title+Content, Two Column, Image Left/Right, Full Image, Blank
-- **Presentation Mode** — Full-screen slideshow with keyboard navigation
-- **Export** — PDF (via browser print) and PPTX (PowerPoint) export
+### Core
+- **Multi-Provider LLM** — Ollama (local), OpenAI, Zhipu (GLM), or any OpenAI-compatible API
+- **Three Generation Modes** — Script, Slides, or Markdown
+- **Edit Mode** — AI-powered edits on individual slides
+- **Preview / HTML Toggle** — Rendered view or raw HTML editing
+- **5 Professional Themes** — Dark, Light, Blue, Green, Red
+
+### Government & Business
+- **Government Bid Mode** — Auto-activates on keywords like "gov bid", "proposal", "compact bid". Enforces concise slides, professional styling, and ask-first slide count (default 5).
+- **Quad Chart** — Triggered by "quad chart" or "quadrant chart". Generates a 2x2 matrix with titled quadrants (Problem/Solution/Benefits/Timeline by default).
+- **Gantt Chart** — Triggered by "Gantt", "timeline", "project schedule". Inline SVG horizontal Gantt bars with task names and time scales.
+- **RACI Matrix** — Triggered by "RACI", "responsibility matrix", "work assignments". Color-coded R/A/C/I cells in a professional table.
+- **Costing / Budget** — Triggered by "cost", "budget", "pricing", "financials". Split table + SVG pie/bar chart with grand total.
+- **PPTX Export Mode** — Auto-activates on "pptx", "powerpoint", "export to pptx". Simplified HTML layout using absolute positioning for converter compatibility.
+
+### Session & Organization
+- **Session History** — Auto-archives previous presentations in the sidebar. Switch between sessions instantly.
+- **HTML Download** — Download any session as a viewer HTML file with all slides.
+- **Logo System** — Upload a logo, pick position (corner), pick size, apply to all slides with one click.
+- **Image Upload** — Upload images, insert into specific slides with "To Slide N" button.
+
+### Export
+- **PDF** — Print-optimized with landscape layout and background color support
+- **PPTX** — Each slide rendered as a high-fidelity image in a PowerPoint deck. Ready for live presentations.
+- **Template Import/Export** — JSON, HTML, Markdown, or clipboard
+
+### Presentation
+- **Full-screen Mode** — Keyboard navigation, on-screen controls
+- **7 Built-in Layouts** — Title, Title+Content, Two Column, Image Left/Right, Full Image, Blank
+
+---
 
 ## Quick Start
 
 ### 1. Prerequisites
 
-- A modern web browser (Chrome, Firefox, Edge)
-- **For local AI:** [Ollama](https://ollama.com) installed and running with at least one model pulled
+- A modern browser (Chrome, Firefox, Edge)
+- **For local AI:** [Ollama](https://ollama.com) installed with a model
 
-### 2. Install Ollama (for local models)
+### 2. Install Ollama (local models)
 
 ```bash
-# Install Ollama from https://ollama.com
-
-# Pull a model (recommended: llama3, mistral, or glm4)
-ollama pull llama3
-
-# Verify Ollama is running
-ollama list
+ollama pull llama3      # General purpose
+ollama pull mistral      # Fast, capable
+ollama pull glm4         # Excellent for structured output
 ```
 
-### 3. Launch Canvas
+### 3. Launch
 
-Option A — Just open the file:
-```
-Double-click index.html in your browser
-```
-
-Option B — Use a local server (recommended for best compatibility):
 ```bash
-# Using Python
 cd canvas
+
+# Option A: Just open index.html in your browser
+
+# Option B: Local server (recommended for Ollama CORS)
 python -m http.server 8080
-
-# Using Node.js (npx)
-npx serve .
-
-# Using PHP
-php -S localhost:8080
+# Then open http://localhost:8080
 ```
 
-Then open `http://localhost:8080` in your browser.
+> **CORS note:** Ollama requires serving from HTTP (not `file://`). Set `OLLAMA_ORIGINS=*` if you have CORS issues.
 
 ### 4. Connect Your LLM
 
 1. Click **Settings** in the top bar
-2. Configure your provider:
-   - **Ollama:** Default URL is `http://localhost:11434` — works out of the box if Ollama is running
-   - **OpenAI:** Enter your API key (`sk-...`)
-   - **Zhipu (GLM):** Enter your GLM API key
-   - **Custom API:** Enter any OpenAI-compatible endpoint URL and key
-3. Click **Save**
-4. Click **Refresh** next to the model selector to load available models
-5. Select your model from the dropdown
+2. Choose provider and enter credentials:
+   - **Ollama:** `http://localhost:11434` (default, works out of the box)
+   - **OpenAI:** Enter API key
+   - **Zhipu (GLM):** Enter API key
+   - **Custom:** Any OpenAI-compatible endpoint
+3. Click **Save**, then **Refresh** models
+4. Select your model from the dropdown
+
+---
 
 ## Usage
 
-### Creating a Presentation
+### Generate a Presentation
 
-1. Select **Generate** mode in the chat panel
-2. Choose a generation format: **Script**, **Slides**, or **Markdown**
-3. Type your request in the chat, e.g.:
-   - "Create a 5-slide presentation about renewable energy"
-   - "Make a business pitch deck for a SaaS startup"
-   - "Build a tutorial presentation on Python basics"
-4. The AI will generate slides — they appear in the preview and thumbnails
-5. Add more slides by asking for additional content
+1. Choose **Generate** mode
+2. Pick **Script**, **Slides**, or **Markdown** format
+3. Type your request:
+   - "Create a 5-slide government bid deck for a cybersecurity contract"
+   - "Make a quad chart for our cloud migration proposal"
+   - "Build a Gantt chart slide for project timeline Q3-Q4"
+   - "Generate a RACI matrix for the development team"
+4. Slides stream in one at a time as the AI generates them
 
-### Editing Slides
+### Edit a Slide
 
-1. Once you have slides, switch to **Edit** mode
-2. Select the slide you want to edit in the thumbnails
-3. Describe your changes in the chat, e.g.:
-   - "Change the title to 'Introduction'"
-   - "Add a bullet list with 4 key points"
-   - "Make the background blue and increase the font size"
-4. The AI will modify only the selected slide
+1. Switch to **Edit** mode
+2. Select the slide
+3. Describe changes: "Add a cost breakdown table", "Change background to navy blue", "Make the title larger"
 
-### Using Templates
+### Logo
 
-Click any template button in the right panel:
-- **Blank Presentation** — Start fresh with a single title slide
-- **Business Pitch** — 5-slide pitch deck template
-- **Tech Overview** — Technical presentation template
-- **Education** — Educational lecture template
-- **Photo Gallery** — Image-focused layout
+1. Click **+ Upload Logo** in the chat panel
+2. Choose position (top-left, top-right, bottom-left, bottom-right)
+3. Choose size (Small, Medium, Large)
+4. Click **Apply** — logo appears on every slide
+5. Click **Remove** to strip it from all slides
 
-### Importing Templates
+### Export
 
-1. Click **Import** in the top bar
-2. Choose a source type:
-   - **Template (.json)** — Canvas template format
-   - **HTML Slides** — One or more HTML files as slides
-   - **Markdown** — Markdown with `---` slide separators
-   - **Clipboard** — Paste HTML or Markdown directly
-3. Choose whether to replace all slides or append
-4. Click **Import**
+- **PDF** — Click Export > PDF. Set margins to "None" and enable "Background Graphics" for dark themes.
+- **PPTX** — Click Export > PPTX. Each slide becomes a high-res image in the PowerPoint deck. Use for live presentations, not for text editing.
+- **HTML** — Click the download arrow on any session in the sidebar.
 
-### Exporting
+---
 
-- **Export Template** — Save current slides as a reusable JSON template
-- **PDF** — Opens a print-friendly view; use Ctrl+P to save as PDF
-- **PPTX** — Downloads as a PowerPoint file
+## Special Modes Reference
 
-### Presentation Mode
+| Keyword | Mode Activated | Behavior |
+|---------|---------------|----------|
+| "gov bid", "proposal", "compact bid" | Government Bid | Max slides (asks user, default 5), concise bullets, navy/white theme, suggests quad/Gantt/RACI |
+| "quad chart", "quadrant chart" | Quad Chart | 2x2 matrix slide with labeled quadrants |
+| "Gantt", "timeline", "project schedule" | Gantt Chart | Inline SVG horizontal bar chart |
+| "RACI", "responsibility matrix" | RACI Matrix | Color-coded responsibility table |
+| "cost", "budget", "pricing" | Costing | Split table + chart with grand total |
+| "pptx", "powerpoint", "ppt" | PPTX Export | Simplified absolute-positioned HTML for converter compatibility |
 
-Click **Present** to enter fullscreen slideshow. Use:
-- **Arrow keys** or **Space** to navigate
-- **Escape** to exit
-- On-screen controls appear on hover at the bottom
-
-### Manual Editing
-
-1. Switch to **HTML** view using the toggle at the top of the workspace
-2. Edit the raw HTML of any slide
-3. Click **Apply HTML** to save changes
-4. Switch back to **Preview** to see the result
+---
 
 ## Keyboard Shortcuts
 
@@ -147,111 +152,40 @@ Click **Present** to enter fullscreen slideshow. Use:
 | `Space` | Next slide (presentation mode) |
 | `Escape` | Exit presentation mode |
 
-## Configuration
-
-Settings are saved to your browser's local storage and persist between sessions.
-
-### Ollama
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Base URL | `http://localhost:11434` | Ollama API endpoint |
-
-### OpenAI
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| API Key | — | Your OpenAI API key |
-| Base URL | `https://api.openai.com/v1` | API endpoint (change for proxies) |
-| Model | `gpt-4o` | Model to use |
-
-### Zhipu (GLM)
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| API Key | — | Your Zhipu API key |
-| Model | `glm-4` | GLM model to use |
-
-### Custom API
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Base URL | — | Any OpenAI-compatible endpoint |
-| API Key | — | Bearer token (optional) |
-| Model | — | Model identifier |
-
-## Template Format
-
-Canvas templates are JSON files with this structure:
-
-```json
-{
-  "name": "My Template",
-  "description": "A custom template",
-  "theme": "dark",
-  "slides": [
-    "<!DOCTYPE html><html>...</html>",
-    "<!DOCTYPE html><html>...</html>"
-  ]
-}
-```
-
-Each slide is a complete HTML document with embedded styles.
-
-## Markdown Import Format
-
-Use `---` on its own line to separate slides:
-
-```markdown
-# Slide Title
-
-Content for the first slide
-
 ---
-
-## Second Slide
-
-- Bullet point 1
-- Bullet point 2
-
----
-
-## Final Slide
-
-Thank you!
-```
 
 ## Project Structure
 
 ```
 canvas/
-├── index.html      # Main application HTML
-├── styles.css      # All styling
-├── app.js           # Core application logic (LLM chat, slide management, templates)
-├── export.js        # PDF and PPTX export functionality
-└── .gitignore       # Git ignore rules
+├── index.html      # Main application UI
+├── styles.css      # Dark theme, layout, components
+├── app.js          # Core logic: LLM, sessions, slides, prompts
+├── export.js       # PDF and PPTX export
+├── templates.json  # External templates
+└── README.md       # This file
 ```
+
+---
 
 ## Troubleshooting
 
-### Ollama models not loading
-- Make sure Ollama is running: `ollama serve`
-- Check the URL in Settings (default: `http://localhost:11434`)
-- Click **Refresh** next to the model selector
+| Problem | Solution |
+|---------|----------|
+| Ollama models not loading | Run `ollama serve`, check URL in Settings, click Refresh |
+| Slides not generating | Verify model is selected, try a different generation mode |
+| CORS errors with custom APIs | Endpoint must support CORS headers, or use a proxy |
+| Dark theme not showing in PDF | Enable "Background Graphics" in browser print dialog |
+| PPTX looks wrong | PPTX exports slides as images — edit in Canvas, not PowerPoint |
+| Images too large | Resize images before uploading — they're embedded as base64 |
 
-### Slides not generating
-- Verify your model is selected in the dropdown
-- Check the browser console (F12) for errors
-- Try a different generation mode (Script, Slides, or Markdown)
+---
 
-### CORS errors with cloud APIs
-- OpenAI and Zhipu APIs work directly from the browser
-- For custom APIs, the endpoint must support CORS headers
-- Consider using a proxy server if CORS is blocked
+## Integration with PersonalAI-Dashboard
 
-### Images not embedding
-- Large images may slow down the LLM context — try resizing before uploading
-- Base64 images are embedded directly into slide HTML
+Presentation Canvas is designed to work standalone or as a companion to the [PersonalAI-Dashboard](https://github.com/norhtecmbarnes-dot/PersonalAI-Dashboard) project. It shares the same LLM provider architecture and can be embedded as a module.
+
+---
 
 ## License
 
