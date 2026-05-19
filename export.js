@@ -187,7 +187,7 @@ body { background: #333; }
     };
 
     function renderSlideToPng(slideHtml) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve) => {
             let bgForCanvas = '#1a1a2e';
             let modifiedHtml = slideHtml;
             try {
@@ -217,56 +217,68 @@ body { background: #333; }
                 });
             } catch (e) { /* use default */ }
 
-            const iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:absolute;left:-9999px;top:0;width:960px;height:540px;border:none;';
-            document.body.appendChild(iframe);
+            // Extract <style> and <body> content from the slide HTML
+            let slideStyle = '';
+            let slideBodyContent = modifiedHtml;
+            const styleMatch = modifiedHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+            if (styleMatch) slideStyle = styleMatch[1];
+            const bodyMatch = modifiedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            if (bodyMatch) slideBodyContent = bodyMatch[1];
+            const bodyTagMatch = modifiedHtml.match(/<body([^>]*)>/i);
+            const bodyAttrs = bodyTagMatch ? bodyTagMatch[1] : '';
+            const inlineStyleMatch = bodyAttrs.match(/style="([^"]*)"/i);
+            const bodyInlineStyle = inlineStyleMatch ? inlineStyleMatch[1] : '';
 
-            const doc = iframe.contentDocument;
-            doc.open();
-            doc.write(modifiedHtml);
-            doc.close();
+            // Transform CSS selectors: body/html -> container div, so they apply correctly
+            let transformedStyle = slideStyle
+                .replace(/(^|[\s{}])body(?=[\s{:,.])/gm, '$1.pptx-render-root')
+                .replace(/(^|[\s{}])html(?=[\s{:,.])/gm, '$1.pptx-render-root')
+                .replace(/min-height\s*:\s*100vh/gi, 'min-height:540px')
+                .replace(/height\s*:\s*100vh/gi, 'height:540px');
 
-            iframe.onload = () => {
-                setTimeout(async () => {
-                    const rootEl = iframe.contentDocument.documentElement;
-                    try {
-                        if (typeof htmlToImage !== 'undefined') {
-                            const dataUrl = await htmlToImage.toPng(rootEl, {
-                                width: 960,
-                                height: 540,
-                                pixelRatio: 2,
-                                backgroundColor: bgForCanvas,
-                                skipFonts: false
-                            });
-                            iframe.remove();
-                            resolve(dataUrl);
-                        } else if (typeof html2canvas !== 'undefined') {
-                            const canvas = await html2canvas(rootEl, {
-                                width: 960,
-                                height: 540,
-                                scale: 2,
-                                backgroundColor: bgForCanvas,
-                                useCORS: true,
-                                allowTaint: true,
-                                logging: false,
-                                scrollX: 0,
-                                scrollY: 0,
-                                windowWidth: 960,
-                                windowHeight: 540
-                            });
-                            iframe.remove();
-                            resolve(canvas.toDataURL('image/png'));
-                        } else {
-                            iframe.remove();
-                            resolve(await fallbackRender(slideHtml));
-                        }
-                    } catch (e) {
-                        console.warn('Render failed, using fallback:', e);
-                        iframe.remove();
-                        resolve(await fallbackRender(slideHtml));
-                    }
-                }, 2000);
-            };
+            // Create a container in the main document (not iframe) with CSS isolation
+            const container = document.createElement('div');
+            container.className = 'pptx-render-root';
+            container.style.cssText = `width:960px;height:540px;overflow:hidden;position:fixed;left:-9999px;top:0;z-index:-9999;${bodyInlineStyle}`;
+            container.innerHTML = `<style>${transformedStyle}</style>${slideBodyContent}`;
+            document.body.appendChild(container);
+
+            // Wait for CSS to apply
+            await new Promise(r => setTimeout(r, 500));
+
+            try {
+                if (typeof htmlToImage !== 'undefined') {
+                    const dataUrl = await htmlToImage.toPng(container, {
+                        width: 960,
+                        height: 540,
+                        pixelRatio: 2,
+                        backgroundColor: bgForCanvas
+                    });
+                    container.remove();
+                    resolve(dataUrl);
+                } else if (typeof html2canvas !== 'undefined') {
+                    const canvas = await html2canvas(container, {
+                        width: 960,
+                        height: 540,
+                        scale: 2,
+                        backgroundColor: bgForCanvas,
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: false,
+                        windowWidth: 960,
+                        windowHeight: 540
+                    });
+                    container.remove();
+                    resolve(canvas.toDataURL('image/png'));
+                } else {
+                    container.remove();
+                    resolve(await fallbackRender(slideHtml));
+                }
+            } catch (e) {
+                console.warn('Render failed, using fallback:', e);
+                container.remove();
+                resolve(await fallbackRender(slideHtml));
+            }
         });
     }
 
