@@ -171,6 +171,8 @@ canvas/
 ├── app.js          # Core logic: LLM, sessions, slides, prompts
 ├── export.js       # PDF and PPTX export
 ├── templates.json  # External templates
+├── samples/        # Sample presentations
+│   └── Government_Bid_Mode_Gemma4.pptx  # Gov Bid Mode example (Gemma 4.3)
 └── README.md       # This file
 ```
 
