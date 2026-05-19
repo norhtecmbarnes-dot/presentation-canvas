@@ -183,9 +183,9 @@ body { background: #333; }
         return new Promise((resolve) => {
             // Extract background color from the slide HTML for html2canvas
             let bgForCanvas = '#1a1a2e';
-            const parser = new DOMParser();
             let modifiedHtml = slideHtml;
             try {
+                const parser = new DOMParser();
                 const parsed = parser.parseFromString(slideHtml, 'text/html');
                 const styleEl = parsed.querySelector('style');
                 if (styleEl) {
@@ -202,8 +202,7 @@ body { background: #333; }
                     const inlineBg = bodyEl.getAttribute('style')?.match(/background(?:-color)?\s*:\s*([^;}"']+)/);
                     if (inlineBg) bgForCanvas = inlineBg[1].trim();
                 }
-
-                // Replace all linear-gradient backgrounds with solid colors in the HTML
+                // Replace linear-gradient backgrounds with solid colors for html2canvas compatibility
                 modifiedHtml = modifiedHtml.replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
                     const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
                     if (colors && colors.length > 0) {
@@ -213,56 +212,48 @@ body { background: #333; }
                 });
             } catch (e) { /* use default */ }
 
-            // Render slide directly into a div (not iframe) for best html2canvas compatibility
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;position:absolute;top:0;left:0;';
-            wrapper.innerHTML = modifiedHtml;
+            const iframe = document.createElement('iframe');
+            iframe.style.cssText = 'width:960px;height:540px;border:none;position:absolute;top:0;left:0;z-index:-1;';
+            // NO sandbox attribute — html2canvas needs full access to the iframe document
+            container.appendChild(iframe);
 
-            // Extract the <style> and innerHTML from the slide's <body>
-            // and apply them to the wrapper so everything renders inline
-            let slideStyle = '';
-            let slideBodyContent = modifiedHtml;
+            const cleanup = () => {
+                try { iframe.remove(); } catch (e) { }
+            };
 
-            const styleMatch = modifiedHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-            if (styleMatch) slideStyle = styleMatch[1];
+            iframe.onload = () => {
+                setTimeout(async () => {
+                    try {
+                        const iframeDoc = iframe.contentDocument;
+                        const iframeBody = iframeDoc.body;
 
-            const bodyMatch = modifiedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-            if (bodyMatch) slideBodyContent = bodyMatch[1];
+                        const canvas = await html2canvas(iframeBody, {
+                            width: 960,
+                            height: 540,
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: bgForCanvas,
+                            logging: false,
+                            windowWidth: 960,
+                            windowHeight: 540
+                        });
 
-            // Also capture inline style from <body> tag
-            const bodyStyleMatch = modifiedHtml.match(/<body[^>]*style="([^"]*)"[^>]*>/i);
-            const bodyInlineStyle = bodyStyleMatch ? bodyStyleMatch[1] : '';
+                        cleanup();
+                        resolve(canvas.toDataURL('image/png'));
+                    } catch (e) {
+                        console.warn('html2canvas on iframe failed:', e);
+                        cleanup();
+                        resolve(await fallbackRender(slideHtml));
+                    }
+                }, 2000);
+            };
 
-            // Build a self-contained div with all styles inlined
-            const renderDiv = document.createElement('div');
-            renderDiv.style.cssText = `width:960px;height:540px;overflow:hidden;position:relative;${bodyInlineStyle}`;
-            renderDiv.innerHTML = `<style>${slideStyle}</style>${slideBodyContent}`;
-
-            container.appendChild(renderDiv);
-
-            // Wait for CSS and fonts to apply
-            setTimeout(async () => {
-                try {
-                    const canvas = await html2canvas(renderDiv, {
-                        width: 960,
-                        height: 540,
-                        scale: 2,
-                        useCORS: true,
-                        allowTaint: true,
-                        backgroundColor: bgForCanvas,
-                        logging: false,
-                        windowWidth: 960,
-                        windowHeight: 540
-                    });
-
-                    renderDiv.remove();
-                    resolve(canvas.toDataURL('image/png'));
-                } catch (e) {
-                    console.warn('html2canvas renderDiv failed, trying iframe approach:', e);
-                    renderDiv.remove();
-                    resolve(await fallbackRender(slideHtml));
-                }
-            }, 1500);
+            // Write slide HTML directly into the iframe (no sandbox)
+            const iframeDoc = iframe.contentDocument;
+            iframeDoc.open();
+            iframeDoc.write(modifiedHtml);
+            iframeDoc.close();
         });
     }
 
