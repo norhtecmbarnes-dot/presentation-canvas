@@ -206,84 +206,142 @@ body { background: #333; }
     }
 
     function renderSlideToPng(slideHtml) {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve) => {
             const bgColor = extractBgColor(slideHtml);
 
-            // Fix the slide HTML: replace gradients with solid bg, inject dimensions
-            let sizedHtml = slideHtml
-                // Replace linear-gradient backgrounds with solid color (first color in gradient)
-                .replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+            // PRIMARY: Render in a div in the main document (html2canvas can read computed styles)
+            // Use DOMParser to rewrite body/html selectors to .slide-wrapper
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(slideHtml, 'text/html');
+
+                // Get and transform the CSS
+                const styleEl = doc.querySelector('style');
+                let css = styleEl ? styleEl.textContent : '';
+
+                // Rewrite selectors: body -> .slide-wrapper, html -> .slide-wrapper
+                css = css
+                    .replace(/(^|[\s{}>,+~])body(?=[\s{}:,.\[#])/gm, '$1.slide-wrapper')
+                    .replace(/(^|[\s{}>,+~])html(?=[\s{}:,.\[#])/gm, '$1.slide-wrapper')
+                    .replace(/min-height\s*:\s*100vh/gi, 'min-height:100%')
+                    .replace(/height\s*:\s*100vh/gi, 'height:100%');
+
+                // Replace gradients with solid colors for reliable rendering
+                css = css.replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
                     const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
                     if (colors && colors.length > 0) return `background: ${colors[0]}`;
                     return match;
-                })
-                // Also replace background-image gradients
-                .replace(/background-image\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+                });
+                css = css.replace(/background-image\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
                     const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
                     if (colors && colors.length > 0) return `background: ${colors[0]}`;
                     return match;
                 });
 
-            // Inject explicit dimensions into the slide HTML
-            sizedHtml = sizedHtml.replace('</head>', '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style></head>');
-            if (!sizedHtml.includes('</head>')) {
-                sizedHtml = '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style>' + sizedHtml;
+                // Build the wrapper div
+                const wrapper = document.createElement('div');
+                wrapper.className = 'slide-wrapper';
+                const bodyEl = doc.querySelector('body');
+                const bodyInlineStyle = bodyEl ? (bodyEl.getAttribute('style') || '') : '';
+
+                // Force exact dimensions and prevent overflow
+                let wrapperCSS = `width:960px;height:540px;overflow:hidden;position:fixed;left:-9999px;top:0;z-index:-9999;${bodyInlineStyle}`;
+                wrapper.style.cssText = wrapperCSS;
+                wrapper.innerHTML = `<style>${css}</style>${bodyEl ? bodyEl.innerHTML : slideHtml}`;
+
+                document.body.appendChild(wrapper);
+
+                // Wait for CSS paint
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+                if (typeof html2canvas !== 'undefined') {
+                    const canvas = await html2canvas(wrapper, {
+                        width: 960,
+                        height: 540,
+                        scale: 2,
+                        backgroundColor: bgColor,
+                        useCORS: true,
+                        allowTaint: true,
+                        logging: false,
+                        scrollX: 0,
+                        scrollY: 0,
+                        windowWidth: 960,
+                        windowHeight: 540
+                    });
+                    wrapper.remove();
+                    resolve(canvas.toDataURL('image/png'));
+                    return;
+                }
+
+                if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
+                    const dataUrl = await htmlToImage.toPng(wrapper, {
+                        width: 960,
+                        height: 540,
+                        pixelRatio: 2,
+                        backgroundColor: bgColor
+                    });
+                    wrapper.remove();
+                    resolve(dataUrl);
+                    return;
+                }
+
+                wrapper.remove();
+            } catch (e) {
+                console.warn('Div render failed:', e);
             }
 
+            // FALLBACK: iframe approach
+            resolve(await iframeRenderFallback(slideHtml, bgColor));
+        });
+    }
+
+    function iframeRenderFallback(slideHtml, bgColor) {
+        return new Promise((resolve, reject) => {
+            let sizedHtml = slideHtml
+                .replace(/background\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
+                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
+                    return match;
+                })
+                .replace(/background-image\s*:\s*linear-gradient\(([^)]+)\)/g, (match, grads) => {
+                    const colors = grads.match(/#[0-9a-fA-F]{3,8}/g);
+                    if (colors && colors.length > 0) return `background: ${colors[0]}`;
+                    return match;
+                });
+            sizedHtml = sizedHtml.replace('</head>', '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;}</style></head>');
+
             const iframe = document.createElement('iframe');
-            // Offscreen but not display:none — browser must paint it
             iframe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:960px;height:540px;border:none;';
 
             iframe.onload = () => {
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-
                 setTimeout(async () => {
                     try {
                         if (typeof html2canvas !== 'undefined') {
                             const canvas = await html2canvas(iframeDoc.body, {
-                                width: 960,
-                                height: 540,
-                                scale: 2,
-                                backgroundColor: bgColor,
-                                useCORS: true,
-                                allowTaint: true,
-                                logging: false,
-                                foreignObjectRendering: false,
-                                scrollX: 0,
-                                scrollY: 0,
-                                windowWidth: 960,
-                                windowHeight: 540
+                                width: 960, height: 540, scale: 2,
+                                backgroundColor: bgColor, useCORS: true, allowTaint: true,
+                                logging: false, scrollX: 0, scrollY: 0,
+                                windowWidth: 960, windowHeight: 540
                             });
                             document.body.removeChild(iframe);
                             resolve(canvas.toDataURL('image/png'));
-                        } else if (typeof htmlToImage !== 'undefined' && htmlToImage.toPng) {
-                            const dataUrl = await htmlToImage.toPng(iframeDoc.body, {
-                                width: 960,
-                                height: 540,
-                                pixelRatio: 2,
-                                backgroundColor: bgColor
-                            });
-                            document.body.removeChild(iframe);
-                            resolve(dataUrl);
                         } else {
                             document.body.removeChild(iframe);
                             resolve(await divRenderFallback(slideHtml));
                         }
                     } catch (e) {
-                        console.error('html2canvas rendering failed:', e);
                         try { document.body.removeChild(iframe); } catch(ex) {}
                         resolve(await divRenderFallback(slideHtml));
                     }
                 }, 500);
             };
 
-            iframe.onerror = (err) => {
-                console.error('Iframe loading error:', err);
+            iframe.onerror = () => {
                 try { document.body.removeChild(iframe); } catch(ex) {}
                 divRenderFallback(slideHtml).then(resolve);
             };
 
-            // Write content AFTER setting onload so we catch the load event
             document.body.appendChild(iframe);
             const doc = iframe.contentDocument || iframe.contentWindow.document;
             doc.open();
