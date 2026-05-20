@@ -411,13 +411,6 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
         return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
     }
 
-    function parsePxToInches(px) {
-        if (!px) return null;
-        var num = parseFloat(px);
-        if (isNaN(num)) return null;
-        return num / 96;
-    }
-
     function sanitizeColorForPptx(color) {
         if (!color) return 'FFFFFF';
         var match = color.match(/#[0-9a-fA-F]{6}/);
@@ -430,18 +423,55 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
         return 'FFFFFF';
     }
 
-    function extractFontSize(element) {
-        var style = element.getAttribute('style') || '';
-        var match = style.match(/font-size\s*:\s*(\d+)px/i);
-        if (match) return parseFloat(match[1]);
+    function resolveStyle(el, cssRules, prop) {
+        var inline = (el.getAttribute('style') || '').match(new RegExp(prop + '\\s*:\\s*([^;]+)', 'i'));
+        if (inline) return inline[1].trim();
+        var tag = el.tagName.toLowerCase();
+        var classes = el.className && typeof el.className === 'string' ? el.className.split(/\s+/) : [];
+        for (var r = 0; r < cssRules.length; r++) {
+            var sel = cssRules[r].selector;
+            var match = cssRules[r].css.match(new RegExp(prop + '\\s*:\\s*([^;}]+)', 'i'));
+            if (!match) continue;
+            var value = match[1].trim();
+            if (sel === tag || sel === el.tagName) return value;
+            for (var cl = 0; cl < classes.length; cl++) {
+                if (sel === '.' + classes[cl]) return value;
+            }
+            if (sel === tag + ' ' + sel || tag + '.' + sel) {
+                for (var cl2 = 0; cl2 < classes.length; cl2++) {
+                    if (sel.indexOf('.' + classes[cl2]) !== -1) return value;
+                }
+            }
+        }
+        var parent = el.parentElement;
+        if (parent && parent !== el.ownerDocument.body && parent !== el.ownerDocument.documentElement) {
+            for (var r2 = 0; r2 < cssRules.length; r2++) {
+                var psel = cssRules[r2].selector;
+                var pmatch = cssRules[r2].css.match(new RegExp(prop + '\\s*:\\s*([^;}]+)', 'i'));
+                if (pmatch && psel.indexOf(tag) !== -1) return pmatch[1].trim();
+            }
+        }
         return null;
     }
 
-    function extractTextColor(element) {
-        var style = element.getAttribute('style') || '';
-        var match = style.match(/color\s*:\s*(#[0-9a-fA-F]{3,6})/i);
-        if (match) return sanitizeColorForPptx(match[1]);
-        return null;
+    function parseCssRules(styleText) {
+        var rules = [];
+        var cleaned = styleText.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n/g, ' ');
+        var blocks = cleaned.match(/([^{]+)\{([^}]+)\}/g) || [];
+        blocks.forEach(function (block) {
+            var parts = block.match(/([^{]+)\{([^}]+)\}/);
+            if (parts) {
+                var selectors = parts[1].split(',').map(function (s) { return s.trim(); });
+                selectors.forEach(function (sel) {
+                    rules.push({ selector: sel, css: parts[2] });
+                });
+            }
+        });
+        return rules;
+    }
+
+    function pptxFontFromHtml(pxSize) {
+        return Math.min(72, Math.max(8, Math.round(pxSize * 1.33)));
     }
 
     window.exportToEditablePPTX = async function (slides, title) {
@@ -464,6 +494,8 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
             }
         }
 
+        var DEFAULT_TAG_SIZES = { H1: 48, H2: 36, H3: 28, H4: 22, H5: 18, H6: 16, P: 18, LI: 16, TD: 14, TH: 16, SPAN: 14, DIV: 16 };
+
         try {
             var pptx = new PptxGenJS();
             pptx.layout = 'LAYOUT_WIDE';
@@ -477,6 +509,7 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
                 var doc = parser.parseFromString(slides[i], 'text/html');
                 var body = doc.querySelector('body');
                 var styleEl = doc.querySelector('style');
+                var cssRules = styleEl ? parseCssRules(styleEl.textContent) : [];
                 var slide = pptx.addSlide();
 
                 var bgColor = '1A1A2E';
@@ -488,70 +521,154 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
                 }
                 slide.background = { color: bgColor };
 
-                var allTextElements = doc.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,div,span,td,th');
-                var textBoxes = [];
+                var bodyChildren = body ? Array.from(body.children) : [];
+                var currentY = 0.4;
+                var LEFT_MARGIN = 0.5;
+                var RIGHT_MARGIN = 0.5;
+                var FULL_WIDTH = 12.33;
+                var slideBottom = 7.1;
+                var imageCount = 0;
 
-                allTextElements.forEach(function (el) {
-                    var text = el.textContent.trim();
-                    if (!text || text.length < 1) return;
+                bodyChildren.forEach(function (container) {
+                    if (container.tagName === 'IMG') return;
 
-                    if (el.closest('svg') || el.closest('canvas')) return;
+                    var headings = container.querySelectorAll('h1,h2,h3,h4,h5,h6');
+                    var paragraphs = container.querySelectorAll('p');
+                    var lists = container.querySelectorAll('ul,ol');
+                    var tables = container.querySelectorAll('table');
+                    var images = container.querySelectorAll('img');
 
-                    var elStyle = el.getAttribute('style') || '';
-                    var fontSize = null;
-                    var tagName = el.tagName.toUpperCase();
+                    headings.forEach(function (h) {
+                        var text = h.textContent.trim();
+                        if (!text) return;
+                        var tag = h.tagName.toUpperCase();
+                        var fontSize = parseInt(resolveStyle(h, cssRules, 'font-size')) || DEFAULT_TAG_SIZES[tag] || 36;
+                        var pptxFs = pptxFontFromHtml(fontSize);
+                        var color = resolveStyle(h, cssRules, 'color');
+                        var pptxColor = color ? sanitizeColorForPptx(color) : 'FFFFFF';
+                        var isBold = tag === 'H1' || tag === 'H2' || tag === 'H3' ||
+                            (resolveStyle(h, cssRules, 'font-weight') || '').match(/bold|700|800|900/);
+                        var marginBottom = tag === 'H1' ? 0.15 : tag === 'H2' ? 0.1 : 0.06;
 
-                    var styleMatch = elStyle.match(/font-size\s*:\s*(\d+)px/i);
-                    if (styleMatch) fontSize = parseInt(styleMatch[1]);
-                    if (!fontSize) {
-                        if (tagName === 'H1') fontSize = 48;
-                        else if (tagName === 'H2') fontSize = 36;
-                        else if (tagName === 'H3') fontSize = 28;
-                        else if (tagName === 'H4') fontSize = 22;
-                        else if (tagName === 'H5' || tagName === 'H6') fontSize = 18;
-                        else fontSize = 18;
-                    }
-
-                    var isBold = tagName.match(/^H[1-4]$/) || (elStyle.indexOf('font-weight:bold') !== -1 || elStyle.indexOf('font-weight:700') !== -1);
-                    var textColor = 'FFFFFF';
-                    var colorMatch = elStyle.match(/color\s*:\s*(#[0-9a-fA-F]{3,6})/i);
-                    if (colorMatch) textColor = sanitizeColorForPptx(colorMatch[1]);
-
-                    var pptxFontSize = Math.min(72, Math.max(8, fontSize * 1.33));
-                    var pptxInches = pptxFontSize / 72;
-
-                    var pt = slide.addText(text, {
-                        x: 0.3,
-                        y: 0.5 + textBoxes.length * (pptxInches + 0.15),
-                        w: 12.7,
-                        h: pptxInches + 0.1,
-                        fontSize: pptxFontSize,
-                        color: textColor,
-                        bold: isBold,
-                        align: 'left',
-                        fontFace: 'Arial'
+                        slide.addText(text, {
+                            x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
+                            h: (pptxFs / 72) + marginBottom,
+                            fontSize: pptxFs, color: pptxColor, bold: !!isBold,
+                            align: 'left', fontFace: 'Calibri'
+                        });
+                        currentY += (pptxFs / 72) + marginBottom + 0.06;
                     });
-                    textBoxes.push(pt);
-                });
 
-                var images = doc.querySelectorAll('img');
-                images.forEach(function (img) {
-                    var src = img.getAttribute('src');
-                    if (src && (src.startsWith('data:image/') || src.startsWith('http'))) {
+                    paragraphs.forEach(function (p) {
+                        var text = p.textContent.trim();
+                        if (!text) return;
+                        var fontSize = parseInt(resolveStyle(p, cssRules, 'font-size')) || 18;
+                        var pptxFs = pptxFontFromHtml(fontSize);
+                        var color = resolveStyle(p, cssRules, 'color');
+                        var pptxColor = color ? sanitizeColorForPptx(color) : 'FFFFFF';
+                        var isBold = (resolveStyle(p, cssRules, 'font-weight') || '').match(/bold|700|800|900/);
+                        var lineH = (pptxFs / 72) + 0.04;
+                        var estLines = Math.max(1, Math.ceil(text.length / 90));
+                        var textH = estLines * lineH;
+
+                        slide.addText(text, {
+                            x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
+                            h: textH, fontSize: pptxFs, color: pptxColor, bold: !!isBold,
+                            align: 'left', fontFace: 'Calibri'
+                        });
+                        currentY += textH + 0.08;
+                    });
+
+                    lists.forEach(function (list) {
+                        var items = list.querySelectorAll('li');
+                        if (items.length === 0) return;
+                        var textLines = [];
+                        items.forEach(function (li) {
+                            var t = li.textContent.trim();
+                            if (t) textLines.push({ text: '\u2022 ' + t, options: { bullet: true } });
+                        });
+                        if (textLines.length === 0) return;
+                        var liFontSize = parseInt(resolveStyle(items[0], cssRules, 'font-size')) || 16;
+                        var liPptxFs = pptxFontFromHtml(liFontSize);
+                        var liColor = resolveStyle(items[0], cssRules, 'color');
+                        var liPptxColor = liColor ? sanitizeColorForPptx(liColor) : 'FFFFFF';
+                        var lineH = (liPptxFs / 72) + 0.06;
+                        var listH = textLines.length * lineH;
+
+                        slide.addText(textLines, {
+                            x: LEFT_MARGIN + 0.25, y: currentY, w: FULL_WIDTH - 0.25,
+                            h: listH, fontSize: liPptxFs, color: liPptxColor,
+                            align: 'left', fontFace: 'Calibri', bullet: true
+                        });
+                        currentY += listH + 0.1;
+                    });
+
+                    tables.forEach(function (table) {
+                        var rows = table.querySelectorAll('tr');
+                        if (rows.length === 0) return;
+                        var pptxRows = [];
+                        var colCount = 0;
+                        rows.forEach(function (row) {
+                            var cells = row.querySelectorAll('td,th');
+                            colCount = Math.max(colCount, cells.length);
+                            var pptxRow = [];
+                            cells.forEach(function (cell) {
+                                pptxRow.push({ text: cell.textContent.trim(), options: { bold: cell.tagName === 'TH', fontSize: 12, align: 'center', color: '333333', fill: { color: cell.tagName === 'TH' ? 'E0E0E0' : 'FFFFFF' } } });
+                            });
+                            pptxRows.push(pptxRow);
+                        });
+                        var tableH = Math.min(3, rows.length * 0.4);
+                        var colW = FULL_WIDTH / Math.max(1, colCount);
+                        try {
+                            slide.addTable(pptxRows, {
+                                x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
+                                border: { pt: 0.5, color: 'CCCCCC' },
+                                colW: colW, rowH: 0.35,
+                                fontSize: 12, fontFace: 'Calibri'
+                            });
+                            currentY += tableH + 0.15;
+                        } catch (e) {
+                            console.warn('Table add failed for slide ' + i, e);
+                        }
+                    });
+
+                    images.forEach(function (img) {
+                        var src = img.getAttribute('src');
+                        if (!src || (!src.startsWith('data:image/') && !src.startsWith('http'))) return;
                         try {
                             slide.addImage({
                                 data: src,
-                                x: 1.5,
-                                y: 1.5 + textBoxes.length * 0.4,
-                                w: 10,
-                                h: 4,
-                                sizing: { type: 'contain', w: 10, h: 4 }
+                                x: 1.5 + (imageCount % 2) * 5,
+                                y: currentY + Math.floor(imageCount / 2) * 3,
+                                w: 4.5, h: 2.8,
+                                sizing: { type: 'contain', w: 4.5, h: 2.8 }
                             });
+                            imageCount++;
                         } catch (e) {
-                            console.warn('Could not embed image in slide ' + i, e);
+                            console.warn('Image skipped in slide ' + i, e);
                         }
+                    });
+                    if (images.length > 0) {
+                        currentY += Math.ceil(images.length / 2) * 3 + 0.2;
                     }
                 });
+
+                if (body) {
+                    var directImages = body.querySelectorAll(':scope > img');
+                    directImages.forEach(function (img) {
+                        var src = img.getAttribute('src');
+                        if (!src || (!src.startsWith('data:image/') && !src.startsWith('http'))) return;
+                        try {
+                            slide.addImage({
+                                data: src, x: 1.5 + (imageCount % 2) * 5,
+                                y: currentY + Math.floor(imageCount / 2) * 3,
+                                w: 4.5, h: 2.8,
+                                sizing: { type: 'contain', w: 4.5, h: 2.8 }
+                            });
+                            imageCount++;
+                        } catch (e) {}
+                    });
+                }
             }
 
             await pptx.writeFile({ fileName: (title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_') + '_editable.pptx' });
