@@ -2015,20 +2015,43 @@ body { background: #111; overflow: hidden; }
         state.currentSlideIndex = 0;
         showPresentationSlide();
         document.getElementById('presentation-mode').style.display = '';
+        window.addEventListener('resize', resizePresentationSlide);
     }
 
     function showPresentationSlide() {
         const container = document.getElementById('presentation-slide');
         const iframe = document.createElement('iframe');
+        iframe.id = 'pres-iframe';
         iframe.sandbox = 'allow-scripts allow-same-origin';
         iframe.srcdoc = state.slides[state.currentSlideIndex];
         container.innerHTML = '';
         container.appendChild(iframe);
         document.getElementById('pres-counter').textContent = `${state.currentSlideIndex + 1} / ${state.slides.length}`;
+        resizePresentationSlide();
+    }
+
+    function resizePresentationSlide() {
+        var iframe = document.getElementById('pres-iframe');
+        if (!iframe) return;
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var scaleX = vw / 960;
+        var scaleY = vh / 540;
+        var scale = Math.min(scaleX, scaleY);
+        var offsetX = (vw - 960 * scale) / 2;
+        var offsetY = (vh - 540 * scale) / 2;
+        iframe.style.width = '960px';
+        iframe.style.height = '540px';
+        iframe.style.transform = 'scale(' + scale + ')';
+        iframe.style.transformOrigin = '0 0';
+        iframe.style.position = 'absolute';
+        iframe.style.left = offsetX + 'px';
+        iframe.style.top = offsetY + 'px';
     }
 
     function endPresentation() {
         document.getElementById('presentation-mode').style.display = 'none';
+        window.removeEventListener('resize', resizePresentationSlide);
     }
 
     function loadTemplate(templateId) {
