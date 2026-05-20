@@ -2,7 +2,7 @@
 
 **AI-powered slide builder for government proposals, business pitches, and professional presentations.**
 
-![Version](https://img.shields.io/badge/version-2.2-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple)
+![Version](https://img.shields.io/badge/version-3.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple)
 
 ---
 
@@ -20,6 +20,8 @@ Government bids demand specific formats — quad charts, RACI matrices, Gantt ti
 - **Government-ready slides** — Auto-detects bid/proposal keywords and enforces concise, evaluator-friendly formatting.
 - **Edit in Canvas, deliver as PDF** — Create here, export PDF for submission or PPTX for live briefings.
 - **Session history** — Every presentation auto-archived. Switch between decks instantly.
+- **Smart Layout Engine** — Every slide is perfectly centered with safe margins, proper header/footer zones, and CSS variables for consistent formatting.
+- **Risk Matrix** — Generate color-coded 5×5 risk assessment matrices from a single prompt.
 
 ---
 
@@ -33,30 +35,50 @@ Government bids demand specific formats — quad charts, RACI matrices, Gantt ti
 - **Preview / HTML Toggle** — Rendered view or raw HTML editing
 - **5 Professional Themes** — Dark, Light, Blue, Green, Red (applies live to all slides)
 - **7 Built-in Layouts** — Title, Title+Content, Two Column, Image Left/Right, Full Image, Blank
+- **Smart Slide Layout Engine** — Automatic centering, safe margins (40px sides, 35px top/bottom), header/content/footer zones, CSS variables for consistent formatting across all slides
 
-### Government & Business
+### Smart Slide Layout Engine
 
-| Keyword | Mode | Behavior |
-|---------|------|----------|
-| "gov bid", "proposal", "compact bid" | Government Bid | Default 5 slides, concise bullets, dark navy styling |
-| "quad chart", "quadrant chart" | Quad Chart | 2×2 matrix with titled quadrants |
-| "Gantt", "timeline", "project schedule" | Gantt Chart | Inline SVG horizontal bar chart |
-| "RACI", "responsibility matrix" | RACI Matrix | Color-coded responsibility assignment table |
-| "cost", "budget", "pricing" | Costing | Split table + pie/bar chart with grand total |
-| "bar chart", "comparison" | Bar Chart | Inline SVG vertical bar chart with axis labels |
-| "pie chart", "donut", "percentage" | Pie / Donut Chart | Inline SVG arc segments with legend |
-| "roadmap", "milestones" | Timeline | Horizontal SVG milestones with date markers |
-| "SWOT", "strengths weaknesses" | SWOT Analysis | 2×2 color-coded quadrant cards |
-| "KPI", "dashboard", "metrics" | KPI Dashboard | 4-card metric grid with delta indicators |
-| "org chart", "hierarchy" | Org Chart | Flexbox hierarchy with SVG connector lines |
-| "vs", "compare", "alternatives" | Comparison Table | Check/cross table with green/red indicators |
+Every generated slide follows these permanent layout rules:
+
+| Rule | Detail |
+|------|--------|
+| **Slide dimensions** | 960×540px (16:9, U.S. Letter) |
+| **CSS variables** | `--slide-width`, `--slide-height`, `--safe-margin`, `--header-height`, `--footer-height` defined in every `:root` |
+| **Safe margins** | 40px left/right, 35px top/bottom minimum |
+| **Header zone** | Top 80–100px for titles and subtitles |
+| **Content zone** | Vertically centered between header and footer |
+| **Footer zone** | Bottom 35–45px for slide numbers and classification labels |
+| **Centering** | Title slides: centered in full height. Content slides: centered between header and footer |
+| **Overflow prevention** | `max-width: 880px` on content, `line-height: 1.5–1.8`, 6–7 lines max per slide |
+| **Format awareness** | A4 or Letter defaults; 16:9 ratio maintained unless user specifies print layout |
+
+### Global Keyword Trigger System
+
+All special slide types and chart modes trigger **globally** — in any generation mode (Generate, Edit, Script, Markdown) — not just in Government Bid Mode. Multiple features can be combined in one deck.
+
+| Keyword(s) | Generated Feature |
+|---|---|
+| "gov bid", "proposal", "compact bid", "RFP", "government" | Government Bid Mode (dark navy theme, max 5 slides, corporate sensitive footer, auto-includes relevant charts) |
+| "quad chart", "quadrant", "2x2" | Quad Chart (2×2 grid with titled quadrants) |
+| "Gantt", "project schedule", "timeline chart", "milestone chart", "project plan" | Gantt Chart (SVG horizontal bar chart) |
+| "RACI", "responsibility matrix", "who does what", "team roles", "work assignment" | RACI Matrix (color-coded responsibility table) |
+| "cost", "budget", "pricing", "financials", "cost breakdown" | Cost / Pricing Table (with grand total) |
+| "bar chart", "column chart", "comparison", "survey", "results" | Bar / Column Chart (SVG) |
+| "pie chart", "donut chart", "percentage", "breakdown", "proportion" | Pie / Donut Chart (SVG + legend) |
+| "SWOT", "strengths weaknesses", "strategic" | SWOT Analysis (2×2 color-coded quadrants) |
+| "KPI", "dashboard", "metrics", "scorecard" | KPI Dashboard (4-card metric grid with deltas) |
+| "org chart", "organization chart", "reporting structure", "hierarchy" | Org Chart (flexbox hierarchy with SVG connectors) |
+| "comparison table", "feature comparison", "vs" | Feature Comparison Table (check/cross indicators) |
+| "timeline", "roadmap" | Horizontal Timeline (SVG milestones with dates) |
+| "risk matrix", "risk assessment" | Risk Matrix (color-coded 5×5 probability vs. impact grid) |
 
 ### Session & Organization
 
 - **Session Sidebar** — Auto-pins previous presentations when starting a new one. Pin/unpin sessions with ★, clear all unpinned in one click, double-click to rename any session. Sidebar state persists across reloads.
 - **Template Import** — Import from clipboard or file with auto-detection of JSON, HTML, or Markdown. Includes a copy-pasteable LLM prompt for generating templates via Gemini, ChatGPT, or any AI. Validates slide quality on import.
 - **Max Slides** — Number input in the mode bar controls deck length before generation.
-- **Footer Label** — Add "CUI", "Company Sensitive", "Do Not Distribute" labels to every slide.
+- **Footer Label** — Add "CUI", "Company Sensitive", "Do Not Distribute" labels to every slide. Labels are auto-injected into all slides when typed, and included in the LLM prompt during generation and editing.
 - **Logo System** — Upload once, pick position and size, apply to all slides with one click.
 - **Image Upload** — Upload images and insert into specific slides with "To Slide N" button.
 - **HTML Download** — Download any session as a standalone viewer HTML file.
@@ -130,11 +152,13 @@ python -m http.server 8080
    - *"Make a quad chart for our cloud migration proposal"*
    - *"Build a Gantt chart slide for project timeline Q3-Q4"*
    - *"Generate a RACI matrix for the development team"*
+   - *"Create a risk matrix for our compliance review"*
+   - *"Build a presentation with a Gantt chart, RACI, and pricing table"*
 5. Slides stream in one at a time as the AI generates them
 
 ### Edit a Slide
 
-1. Switch to **Edit** mode
+1. Switch to **Edit** mode (button highlights orange)
 2. Select the slide
 3. Describe changes: *"Add a cost breakdown table"*, *"Change background to navy blue"*, *"Make the title larger"*
 
@@ -154,7 +178,10 @@ python -m http.server 8080
 
 ### Footer Labels
 
-Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive", "Do Not Distribute"). The label is included in every generated slide footer.
+Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive", "Do Not Distribute"). Labels are:
+- **Auto-injected** into every slide as a subtle `<div>` at the bottom-right
+- **Included in the LLM prompt** during both generation and editing
+- **Debounced** — updates all slides 600ms after you stop typing
 
 ### Export
 
@@ -182,11 +209,10 @@ Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive", "Do Not Dis
 canvas/
 ├── index.html      # Main application UI
 ├── styles.css      # Dark theme, layout, components
-├── app.js          # Core logic: LLM, sessions, slides, prompts
+├── app.js          # Core logic: LLM, sessions, slides, prompts, layout engine
 ├── export.js       # PDF and PPTX export
 ├── templates.json  # External templates
 ├── samples/        # Sample presentations
-│   └── Government_Bid_Mode_Gemma4.pptx  # Gov Bid Mode example (Gemma 4.3)
 └── README.md       # This file
 ```
 
@@ -203,6 +229,29 @@ canvas/
 | Dark theme not showing in PDF | Enable "Background Graphics" in browser print dialog |
 | PPTX looks wrong | PPTX exports slides as images — edit in Canvas, not PowerPoint |
 | Images too large | Resize images before uploading — they're embedded as base64 |
+| Edit mode not working | Make sure you click the Edit button (highlights orange) and a slide is selected |
+| Footer labels not appearing | Type in the Footer Label field — it auto-injects into all slides after 600ms |
+| Slides not centered | All new slides use the Smart Layout Engine with CSS variables and safe margins |
+
+---
+
+## Changelog
+
+### v3.0
+
+- **Smart Slide Layout Engine** — Every slide now uses CSS variables (`--slide-width`, `--slide-height`, `--safe-margin`, `--header-height`, `--footer-height`) for consistent centering, safe margins, and proper header/content/footer zones
+- **Global Keyword Trigger System** — All chart types and special modes now trigger globally in any generation mode (Generate, Edit, Script, Markdown), not just in Government Bid Mode
+- **Risk Matrix** — New chart type triggered by "risk matrix" or "risk assessment" — generates a color-coded 5×5 probability vs. impact grid
+- **Expanded trigger keywords** — Added "column chart", "donut chart", "cost breakdown", "responsibility matrix", "work assignment", "organization chart", "feature comparison", "scorecard", "timeline chart", "milestone chart"
+- **Footer labels** — Now auto-injected into all slides when typed (debounced 600ms), and included in edit mode prompts
+- **Edit mode fix** — Edit button now correctly highlights orange when active
+
+### v2.2
+
+- Initial release with Ollama, OpenAI, Zhipu/GLM support
+- 5 themes, 7 layouts, 4 built-in templates, session history
+- PDF and PPTX export, logo system, image upload
+- Government Bid Mode, quad charts, Gantt, RACI, KPI dashboards
 
 ---
 

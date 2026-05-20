@@ -3,11 +3,12 @@
 
     const DEFAULT_SLIDE_HTML = `<!DOCTYPE html>
 <html><head><style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; }
-.container { text-align: center; padding: 40px; }
-h1 { font-size: 48px; margin-bottom: 16px; color: #ffffff; }
-p { font-size: 24px; color: #a0a0b0; }
+:root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{width:var(--slide-width);height:var(--slide-height);overflow:hidden;font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;display:flex;align-items:center;justify-content:center;}
+.container{width:880px;max-width:calc(var(--slide-width) - 2*var(--safe-margin));text-align:center;}
+h1{font-size:48px;margin-bottom:16px;color:#ffffff;}
+p{font-size:24px;color:#a0a0b0;}
 </style></head><body>
 <div class="container"><h1>Presentation Canvas</h1><p>Describe your presentation in the chat panel to get started.</p></div>
 </body></html>`;
@@ -516,6 +517,30 @@ p { font-size: 24px; color: #a0a0b0; }
         }
     }
 
+    function applyFooterLabel() {
+        var label = document.getElementById('footer-label-input').value.trim();
+        var t = SLIDE_THEMES[state.currentTheme];
+        state.slides = state.slides.map(function(html, i) {
+            html = html.replace(/<div[^>]*class="canvas-footer"[^>]*>[^<]*<\/div>/g, '');
+            html = html.replace(/<div[^>]*data-canvas-footer[^>]*>[^<]*<\/div>/g, '');
+            if (label) {
+                var footerDiv = '<div class="canvas-footer" data-canvas-footer style="position:absolute;bottom:8px;right:16px;font-size:10px;opacity:0.6;color:' + t.color + ';pointer-events:none;">' + escapeHtml(label) + '</div>';
+                if (html.indexOf('</body>') !== -1) {
+                    html = html.replace('</body>', footerDiv + '</body>');
+                } else {
+                    html = html + footerDiv;
+                }
+                if (!html.match(/position\s*:\s*relative/i) && !html.match(/position\s*:\s*absolute/i)) {
+                    html = html.replace(/<body/i, '<body style="position:relative;"');
+                }
+            }
+            return html;
+        });
+        saveCurrentSession();
+        renderSlidePreview();
+        renderThumbnails();
+    }
+
     function applyLogoToAllSlides() {
         if (!state.logo || state.slides.length === 0) return;
 
@@ -583,6 +608,7 @@ p { font-size: 24px; color: #a0a0b0; }
 
         genBtn.classList.toggle('active', mode === 'generate');
         editBtn.classList.toggle('active', mode === 'edit');
+        editBtn.classList.toggle('mode-btn-edit', mode === 'edit');
 
         if (mode === 'generate') {
             chatInput.placeholder = 'Describe your presentation... e.g. "Create a 5-slide presentation about renewable energy"';
@@ -934,12 +960,15 @@ p { font-size: 24px; color: #a0a0b0; }
         var iconCss = '';
         for (var ik in ICONS) { iconCss += '- ' + ik + ': ' + ICONS[ik].replace(/%ac%/g, ac) + '\n'; }
 
-        const exampleSlide = '<!DOCTYPE html><html><head><style>\n' +
-            '* { margin:0; padding:0; box-sizing:border-box; }\n' +
-            'body { display:flex; align-items:center; justify-content:center; width:960px; height:540px; font-family:\'Segoe UI\',sans-serif; background:' + bg + '; color:' + c + '; overflow:hidden; }\n' +
-            '.container { width:880px; padding:40px; text-align:center; }\n' +
+        const exampleSlide = '<!DOCTYPE html>\n<html><head><style>\n' +
+            ':root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}\n' +
+            '*{margin:0;padding:0;box-sizing:border-box;}\n' +
+            'body{width:var(--slide-width);height:var(--slide-height);overflow:hidden;font-family:\'Segoe UI\',sans-serif;background:' + bg + ';color:' + c + ';display:flex;align-items:center;justify-content:center;}\n' +
+            '.container{width:880px;max-width:calc(var(--slide-width) - 2*var(--safe-margin));text-align:center;}\n' +
+            'h1{font-size:48px;color:' + h1c + ';margin-bottom:16px;}\n' +
+            'p{font-size:22px;}\n' +
             '</style></head><body>\n' +
-            '<div class="container"><h1 style="font-size:48px;color:' + h1c + ';">Title</h1><p style="font-size:22px;">Content here</p></div>\n' +
+            '<div class="container"><h1>Title</h1><p>Content here</p></div>\n' +
             '</body></html>';
 
         const govBg = '#0a2342', govAccent = '#00b4d8';
@@ -958,18 +987,57 @@ MANDATORY RULES:
 3. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks. No other text.
 4. Each slide MUST be under 3000 characters total.
 
+═══════════════════════════
+SMART LAYOUT ENGINE (PERMANENT - ALL SLIDES)
+═══════════════════════════
+Every slide MUST follow these layout rules:
+
+A) CSS VARIABLES — Define at the top of every <style> tag:
+   :root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}
+
+B) BODY — Always use these exact properties:
+   body{width:var(--slide-width);height:var(--slide-height);overflow:hidden;display:flex;flex-direction:column;...}
+
+C) SAFE MARGINS — Minimum 40px left/right, 35px top/bottom. Content must never touch edges.
+   Use max-width:calc(var(--slide-width) - 2*var(--safe-margin)) on content containers.
+
+D) VERTICAL ZONES:
+   - Header zone: top 80-100px (title + subtitle)
+   - Content zone: center, between header and footer, vertically centered
+   - Footer zone: bottom 35-45px (slide number, classification label)
+   For title-only slides: center content in the full slide height.
+   For content slides: center content within the area between header and footer.
+
+E) CENTERING — Always use flexbox centering:
+   For title slides: body{display:flex;align-items:center;justify-content:center;}
+   For content slides: body{display:flex;flex-direction:column;...} with a content wrapper that has flex:1;display:flex;align-items:center;justify-content:center;
+
+F) TEXT OVERFLOW PREVENTION:
+   - Use max-width on all text containers
+   - Use line-height:1.5-1.8 for body text
+   - Keep body text at 16-22px, headings at 28-48px
+   - Max 6-7 lines of text per slide
+
+G) FORMAT AWARENESS:
+   - Default: 960x540px (16:9) — U.S. Letter context
+   - If user says "A4" or "international": same 16:9 but note A4 export
+   - If user says "print" or "Letter": maintain 16:9 ratio for on-screen viewing
+
 Current theme colors: background=${bg} text=${c} accent=${ac} headings=${h1c}
 Use these EXACT color values in your CSS (not CSS variables).
 
-EXAMPLE of a valid slide:
+EXAMPLE of a valid slide (note the CSS variables and centered layout):
 ${exampleSlide}
 
 DESIGN RULES:
 - Use solid background colors only. NO linear-gradient, NO radial-gradient.
-- Use display:flex or display:grid for layout. Keep it simple.
+- Use display:flex or display:grid for layout. Always center content properly.
 - Fonts: 'Segoe UI', Arial, Helvetica, sans-serif only.
 - Maximum 6-7 lines of text per slide. Be concise.
-- Add a small footer on content slides: 'Slide N | Title'
+- Always include the CSS variables (:root block) in every slide's <style> tag.
+- Always use flexbox centering with safe margins. Content must never touch slide edges.
+- Title slides: center vertically in full slide. Content slides: center within the content zone (between header and footer).
+- Add a small footer on content slides: position absolute, bottom:8px, right:16px, font-size:10px, opacity:0.6
 
 ═══════════════════════════
 BUILT-IN SVG ICONS (copy these into your slides):
@@ -979,23 +1047,45 @@ ${iconCss}
 To use an icon, copy the SVG code and set width/height as needed.
 For example, a checkmark: <svg viewBox="0 0 20 20" width="24" height="24"><path d="M4 10l4 4 8-8" stroke="${ac}" stroke-width="2" fill="none"/></svg>
 
+══════════════════════════════════════════════════════
+GLOBAL KEYWORD TRIGGER TABLE (PERMANENT — ALL MODES)
 ═══════════════════════════
-GOVERNMENT BID MODE
+These triggers activate ANYWHERE — in Generate, Edit, Script, or Markdown mode — not just in Government Bid Mode. Multiple features can combine in one deck.
+
+| Keyword(s) | Feature |
+|---|---|
+| "gov bid", "proposal", "compact bid", "RFP", "government" | Government Bid Mode (see below) |
+| "quad chart", "quadrant", "2x2" | Quad Chart |
+| "Gantt", "project schedule", "timeline chart", "milestone chart", "project plan" | Gantt Chart |
+| "RACI", "responsibility matrix", "who does what", "team roles", "work assignment" | RACI Matrix |
+| "cost", "budget", "pricing", "financials", "cost breakdown" | Cost / Pricing Table |
+| "bar chart", "column chart", "comparison", "survey", "results" | Bar / Column Chart |
+| "pie chart", "donut chart", "percentage", "breakdown", "proportion" | Pie or Donut Chart |
+| "SWOT", "strengths weaknesses", "strategic" | SWOT Analysis |
+| "KPI", "dashboard", "metrics", "scorecard" | KPI Dashboard |
+| "org chart", "organization chart", "reporting structure", "hierarchy" | Org Chart |
+| "comparison table", "feature comparison", "vs" | Feature Comparison Table |
+| "timeline", "roadmap" | Horizontal Timeline |
+| "risk matrix", "risk assessment" | Risk Matrix |
+
+When a keyword is detected, you MUST include the corresponding chart/table/feature in the generated slides.
+
 ═══════════════════════════
-Trigger: user says "gov bid", "proposal", "compact bid", "quad chart", "RFP", "government".
+GOVERNMENT BID MODE (activated by: "gov bid", "proposal", "compact bid", "RFP", "government")
+═══════════════════════════
 Rules:
 - Default 5 slides unless user specifies a number. Use that exact number.
 - Theme override: background=${govBg} text=#ffffff accent=${govAccent} headings=#ffffff
 - Maximum 4 bullets per slide. Large fonts. Minimal text. No decoration.
 - Government style: dark navy background, white text, strong contrast, clean lines.
-- Auto-suggest: Gantt chart, RACI matrix, or costing slide if relevant.
+- Auto-include: If the topic relates to scheduling, add a Gantt chart slide. If it relates to team roles, add a RACI matrix. If it relates to costs, add a costing slide.
 
 ═══════════════════════════
-CHART TYPES — SVG Examples You CAN Copy and Adapt
+CHART TYPES — SVG / HTML Examples (copy and adapt for ANY presentation)
 ═══════════════════════════
 
-=== BAR CHART (comparisons, survey results) ===
-Trigger: "bar chart", "comparison", "survey", "results"
+=== BAR / COLUMN CHART (comparisons, survey results) ===
+Trigger: "bar chart", "column chart", "comparison", "survey", "results"
 <svg width="700" height="280" viewBox="0 0 700 280">
   <!-- 3 bars, heights adjusted to data -->
   <rect x="60" y="80" width="70" height="160" fill="${ac}" rx="3"/>
@@ -1013,7 +1103,7 @@ Trigger: "bar chart", "comparison", "survey", "results"
 </svg>
 
 === PIE / DONUT CHART (percentages, breakdown) ===
-Trigger: "pie chart", "donut", "percentage", "breakdown", "proportion"
+Trigger: "pie chart", "donut chart", "percentage", "breakdown", "proportion"
 <svg width="240" height="240" viewBox="0 0 240 240">
   <!-- Slice 1: 45% = 0..162 degrees -->
   <path d="M120 120 L120 30 A90 90 0 0 1 202 174 Z" fill="${ac}"/>
@@ -1028,7 +1118,7 @@ Trigger: "pie chart", "donut", "percentage", "breakdown", "proportion"
 </svg>
 
 === GANTT CHART (project schedule, timeline) ===
-Trigger: "Gantt", "project schedule", "milestone", "project plan"
+Trigger: "Gantt", "project schedule", "timeline chart", "milestone chart", "project plan"
 <svg width="900" height="280" viewBox="0 0 900 280">
   <!-- Month headers -->
   <text x="220" y="30" fill="${c}" font-size="12">Jun</text>
@@ -1052,7 +1142,7 @@ Trigger: "Gantt", "project schedule", "milestone", "project plan"
 </svg>
 
 === TIMELINE (roadmap, history, milestones) ===
-Trigger: "timeline", "roadmap", "history", "milestones", "when"
+Trigger: "timeline", "roadmap"
 <svg width="900" height="160" viewBox="0 0 900 160">
   <!-- Horizontal line -->
   <line x1="50" y1="80" x2="850" y2="80" stroke="${ac}" stroke-width="3"/>
@@ -1075,7 +1165,7 @@ Trigger: "timeline", "roadmap", "history", "milestones", "when"
 </svg>
 
 === RACI MATRIX (responsibilities, who does what) ===
-Trigger: "RACI", "responsibility", "who does what", "team roles"
+Trigger: "RACI", "responsibility matrix", "who does what", "team roles", "work assignment"
 Use a simple HTML <table>:
 <table style="width:100%;border-collapse:collapse;font-size:14px;">
   <tr><th style="background:${ac};color:#fff;padding:8px;">Task</th><th style="background:${ac};color:#fff;padding:8px;">Alice</th><th style="background:${ac};color:#fff;padding:8px;">Bob</th><th style="background:${ac};color:#fff;padding:8px;">Carol</th></tr>
@@ -1086,7 +1176,7 @@ Use a simple HTML <table>:
 R=Responsible (green #2e7d32)  A=Accountable (blue #1565c0)  C=Consulted (orange #ef6c00)  I=Informed (gray #757575)
 
 === COST TABLE (budget, pricing, financials) ===
-Trigger: "cost", "budget", "pricing", "financials"
+Trigger: "cost", "budget", "pricing", "financials", "cost breakdown"
 <table style="width:100%;border-collapse:collapse;font-size:14px;">
   <tr><th style="background:${ac};color:#fff;padding:8px;text-align:left;">Item</th><th style="background:${ac};color:#fff;padding:8px;">Qty</th><th style="background:${ac};color:#fff;padding:8px;">Unit</th><th style="background:${ac};color:#fff;padding:8px;text-align:right;">Total</th></tr>
   <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Item A</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;">10</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;">$500</td><td style="text-align:right;padding:6px;border-bottom:1px solid ${c}33;">$5,000</td></tr>
@@ -1117,7 +1207,7 @@ Use a 2x2 CSS Grid:
 </div>
 
 === KPI DASHBOARD (metrics, stats, numbers at a glance) ===
-Trigger: "KPI", "dashboard", "metrics", "stats", "numbers"
+Trigger: "KPI", "dashboard", "metrics", "scorecard"
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;padding:40px;">
   <div style="text-align:center;background:${bg};padding:24px 12px;border-radius:10px;border:1px solid ${c}33;">
     <div style="font-size:36px;font-weight:bold;color:${ac};">$4.2M</div>
@@ -1142,7 +1232,7 @@ Trigger: "KPI", "dashboard", "metrics", "stats", "numbers"
 </div>
 
 === ORG CHART (team structure, reporting) ===
-Trigger: "org chart", "organization", "reporting structure", "hierarchy"
+Trigger: "org chart", "organization chart", "reporting structure", "hierarchy"
 <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px;">
   <div style="background:${ac};color:#fff;padding:12px 28px;border-radius:8px;font-size:16px;font-weight:bold;">CEO</div>
   <svg width="240" height="24"><line x1="120" y1="0" x2="120" y2="24" stroke="${c}" stroke-width="1"/></svg>
@@ -1180,13 +1270,53 @@ Trigger: "quad chart", "quadrant", "2x2"
 </div>
 
 === COMPARISON TABLE (vs, alternatives, features) ===
-Trigger: "vs", "compare", "comparison", "alternatives", "feature table"
+Trigger: "comparison table", "feature comparison", "vs"
 <table style="width:100%;border-collapse:collapse;font-size:14px;">
   <tr><th style="background:${ac};color:#fff;padding:8px;text-align:left;">Feature</th><th style="background:${ac};color:#fff;padding:8px;">Option A</th><th style="background:${ac};color:#fff;padding:8px;">Option B</th></tr>
   <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Feature 1</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#66bb6a;">&#10003;</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#ef5350;">&#10007;</td></tr>
   <tr><td style="padding:6px;border-bottom:1px solid ${c}33;">Feature 2</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#ef5350;">&#10007;</td><td style="text-align:center;padding:6px;border-bottom:1px solid ${c}33;color:#66bb6a;">&#10003;</td></tr>
 </table>
 
+=== RISK MATRIX (risk assessment, probability vs impact) ===
+Trigger: "risk matrix", "risk assessment"
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:2px;padding:20px;">
+  <!-- Header row -->
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:12px;font-weight:bold;">Impact →</div>
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;">Negligible</div>
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;">Minor</div>
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;">Moderate</div>
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;">Major</div>
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;">Catastrophic</div>
+  <!-- Row: Very Likely -->
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;font-weight:bold;">Very Likely</div>
+  <div style="background:#ffca28;padding:8px;text-align:center;font-size:11px;color:#333;">Medium</div>
+  <div style="background:#ff9800;padding:8px;text-align:center;font-size:11px;color:#fff;">High</div>
+  <div style="background:#f44336;padding:8px;text-align:center;font-size:11px;color:#fff;">Extreme</div>
+  <div style="background:#b71c1c;padding:8px;text-align:center;font-size:11px;color:#fff;">Extreme</div>
+  <div style="background:#b71c1c;padding:8px;text-align:center;font-size:11px;color:#fff;">Extreme</div>
+  <!-- Row: Likely -->
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;font-weight:bold;">Likely</div>
+  <div style="background:#66bb6a;padding:8px;text-align:center;font-size:11px;color:#fff;">Low</div>
+  <div style="background:#ffca28;padding:8px;text-align:center;font-size:11px;color:#333;">Medium</div>
+  <div style="background:#ff9800;padding:8px;text-align:center;font-size:11px;color:#fff;">High</div>
+  <div style="background:#f44336;padding:8px;text-align:center;font-size:11px;color:#fff;">Extreme</div>
+  <div style="background:#b71c1c;padding:8px;text-align:center;font-size:11px;color:#fff;">Extreme</div>
+  <!-- Row: Possible -->
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;font-weight:bold;">Possible</div>
+  <div style="background:#66bb6a;padding:8px;text-align:center;font-size:11px;color:#fff;">Low</div>
+  <div style="background:#66bb6a;padding:8px;text-align:center;font-size:11px;color:#fff;">Low</div>
+  <div style="background:#ffca28;padding:8px;text-align:center;font-size:11px;color:#333;">Medium</div>
+  <div style="background:#ff9800;padding:8px;text-align:center;font-size:11px;color:#fff;">High</div>
+  <div style="background:#f44336;padding:8px;text-align:center;font-size:11px;color:#fff;">Extreme</div>
+  <!-- Row: Unlikely -->
+  <div style="background:${ac};color:#fff;padding:8px;text-align:center;font-size:11px;font-weight:bold;">Unlikely</div>
+  <div style="background:#66bb6a;padding:8px;text-align:center;font-size:11px;color:#fff;">Low</div>
+  <div style="background:#66bb6a;padding:8px;text-align:center;font-size:11px;color:#fff;">Low</div>
+  <div style="background:#66bb6a;padding:8px;text-align:center;font-size:11px;color:#fff;">Low</div>
+  <div style="background:#ffca28;padding:8px;text-align:center;font-size:11px;color:#333;">Medium</div>
+  <div style="background:#ff9800;padding:8px;text-align:center;font-size:11px;color:#fff;">High</div>
+</div>
+Risk levels: Low=#66bb6a  Medium=#ffca28  High=#ff9800  Extreme=#f44336/#b71c1c
 CONTENT RULES:
 - Max 6-7 lines per slide. Big fonts (16-24px for body, 28-48px for headings).
 - Logical flow: title slide -> agenda/overview -> content slides -> summary.
@@ -1211,7 +1341,7 @@ CONTENT RULES:
 
     function getCompactPrompt(mode, t, govBg, govAccent) {
         var bg = t.background, c = t.color, ac = t.accent, h1c = t.h1Color;
-        var exampleSlide = '<!DOCTYPE html><html><head><style>*{margin:0;padding:0;}body{display:flex;align-items:center;justify-content:center;width:960px;height:540px;font-family:\'Segoe UI\',sans-serif;background:'+bg+';color:'+c+';overflow:hidden;}h1{font-size:48px;color:'+h1c+';}p{font-size:20px;}</style></head><body><div style="text-align:center;padding:40px;"><h1>Slide Title</h1><p>Your content here</p></div></body></html>';
+        var exampleSlide = '<!DOCTYPE html><html><head><style>:root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}*{margin:0;padding:0;box-sizing:border-box;}body{width:var(--slide-width);height:var(--slide-height);overflow:hidden;font-family:\'Segoe UI\',sans-serif;background:'+bg+';color:'+c+';display:flex;align-items:center;justify-content:center;}.container{width:880px;max-width:calc(var(--slide-width) - 2*var(--safe-margin));text-align:center;}h1{font-size:48px;color:'+h1c+';}p{font-size:20px;}</style></head><body><div class="container"><h1>Slide Title</h1><p>Your content here</p></div></body></html>';
         var gov = '';
 
         if (/gov bid|proposal|compact bid|RFP|quad chart|government/.test(state.chatHistory.slice(-1)[0]?.content || '')) {
@@ -1219,13 +1349,18 @@ CONTENT RULES:
         }
 
         var prompt = 'Create HTML slides. Each slide = 960x540px. Wrap each in <<<SLIDE>>>...<<<END_SLIDE>>>.\n\n' +
-            'CRITICAL RULES:\n' +
-            '1. body { width:960px;height:540px;overflow:hidden; }\n' +
-            '2. All CSS in one <style> tag. No external files. No JS.\n' +
-            '3. Output ONLY markers and HTML. No extra text.\n' +
-            '4. Use ONLY solid background colors. No gradients.\n' +
-            '5. Each slide under 3000 characters.\n\n' +
-            'Colors to use: background='+bg+' text='+c+' accent='+ac+'\n\n' +
+            'LAYOUT RULES (EVERY SLIDE):\n' +
+            '1. Define CSS variables: :root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}\n' +
+            '2. body { width:var(--slide-width);height:var(--slide-height);overflow:hidden; }\n' +
+            '3. Safe margins: 40px left/right, 35px top/bottom. Content NEVER touches edges.\n' +
+            '4. Title slides: center content in full slide height.\n' +
+            '5. Content slides: content centered between header (top 90px) and footer (bottom 40px).\n' +
+            '6. Use flexbox centering. max-width content containers.\n' +
+            '7. All CSS in one <style> tag. No external files. No JS.\n' +
+            '8. Output ONLY markers and HTML. No extra text.\n' +
+            '9. Use ONLY solid background colors. No gradients.\n' +
+            '10. Each slide under 3000 characters.\n\n' +
+            'Colors: background='+bg+' text='+c+' accent='+ac+'\n\n' +
             'EXAMPLE (copy this pattern):\n'+
             exampleSlide + '\n\n' +
             gov;
@@ -1248,9 +1383,11 @@ CONTENT RULES:
                 '4. Wrap in <<<SLIDE>>>...<<<END_SLIDE>>>.\n' +
                 '5. Only the changes requested. Keep everything else.\n' +
                 '6. Under 3000 chars.\n' +
-                '7. If a chart or SVG is too complex, use a simple table or list instead.';
+                '7. If a chart or SVG is too complex, use a simple table or list instead.\n' +
+                '8. Always include CSS variables: :root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}\n' +
+                '9. Center content with flexbox. Safe margins 40px. Content never touches edges.';
         }
-        return 'You are editing a presentation slide. The user wants a specific change.\n\n' +
+        var prompt = 'You are editing a presentation slide. The user wants a specific change.\n\n' +
             'RULES:\n' +
             '1. Return the COMPLETE modified HTML document with <!DOCTYPE html>, <html>, <head> with <style>, and <body>.\n' +
             '2. All CSS in a single <style> tag. No external links, no JavaScript.\n' +
@@ -1259,7 +1396,22 @@ CONTENT RULES:
             '5. Wrap the slide in <<<SLIDE>>> / <<<END_SLIDE>>> markers.\n' +
             '6. Output ONLY the markers and HTML. No explanations.\n' +
             '7. Make ONLY the requested changes. Keep everything else exactly as-is.\n' +
-            '8. Slide must be under 3000 characters.';
+            '8. Slide must be under 3000 characters.\n\n' +
+            'SMART LAYOUT RULES:\n' +
+            '- Always include CSS variables in :root: --slide-width:960px; --slide-height:540px; --safe-margin:40px; --header-height:90px; --footer-height:40px;\n' +
+            '- Safe margins: 40px left/right, 35px top/bottom minimum.\n' +
+            '- Title slides: center content vertically in full slide height.\n' +
+            '- Content slides: center content between header (top 80-100px) and footer (bottom 35-45px).\n' +
+            '- Use flexbox centering. Never let content touch slide edges.\n' +
+            '- max-width on content containers: 880px (960 - 2*40).\n' +
+            '- If the slide already follows these layout rules, preserve them. If not, add them.';
+
+        var footerLabel = document.getElementById('footer-label-input').value.trim();
+        if (footerLabel) {
+            prompt += '\n\nFOOTER LABEL: This slide must include a footer with the text "' + footerLabel + '" in small font, typically at the bottom-right or bottom-center. This label should be subtle but legible (e.g. font-size:10px, opacity:0.6, color matching the text). If the slide already has this footer, preserve it. If not, add it.';
+        }
+
+        return prompt;
     }
 
     function parseSlidesFromResponse(response) {
@@ -1933,6 +2085,9 @@ body { background: #111; overflow: hidden; }
             e.target.value = '';
         });
 
+        document.getElementById('footer-label-input').addEventListener('input', debounceFooterLabel);
+        document.getElementById('footer-label-input').addEventListener('change', applyFooterLabel);
+
         document.getElementById('logo-apply-btn').addEventListener('click', applyLogoToAllSlides);
         document.getElementById('logo-remove-btn').addEventListener('click', removeLogoFromAllSlides);
 
@@ -1973,14 +2128,15 @@ body { background: #111; overflow: hidden; }
             const layout = e.target.value;
             if (!layout) return;
             const theme = SLIDE_THEMES[state.currentTheme];
+            const v = ':root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}';
             const layouts = {
-                'title': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.container{text-align:center;padding:60px;}h1{font-size:56px;margin-bottom:16px;color:${theme.h1Color};}p{font-size:24px;color:${theme.color};opacity:0.8;}</style></head><body><div class="container"><h1>Title Here</h1><p>Subtitle goes here</p></div></body></html>`,
-                'title-content': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};padding:60px;}.title{font-size:36px;margin-bottom:30px;color:${theme.h2Color};border-bottom:3px solid ${theme.accent};padding-bottom:10px;display:inline-block;}.content{font-size:20px;line-height:1.8;}</style></head><body><div class="title">Slide Title</div><div class="content"><p>Content goes here</p></div></body></html>`,
-                'two-column': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};padding:60px;}.title{font-size:36px;margin-bottom:30px;color:${theme.h2Color};}.columns{display:flex;gap:40px;}.column{flex:1;}.column h3{color:${theme.accent};margin-bottom:12px;}.column p{font-size:18px;line-height:1.6;}</style></head><body><div class="title">Two Column Slide</div><div class="columns"><div class="column"><h3>Left Column</h3><p>Content here</p></div><div class="column"><h3>Right Column</h3><p>Content here</p></div></div></body></html>`,
-                'image-left': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.image-side{width:40%;background:#333;display:flex;align-items:center;justify-content:center;}.content-side{flex:1;padding:60px;display:flex;flex-direction:column;justify-content:center;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}</style></head><body><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div></body></html>`,
-                'image-right': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{display:flex;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};}.content-side{flex:1;padding:60px;display:flex;flex-direction:column;justify-content:center;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}.image-side{width:40%;background:#333;display:flex;align-items:center;justify-content:center;}</style></head><body><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div></body></html>`,
-                'full-image': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:#333;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;}.overlay{padding:40px;z-index:1;}.overlay h1{font-size:48px;margin-bottom:16px;}.overlay p{font-size:24px;opacity:0.9;}</style></head><body><div class="overlay"><h1>Full Image Slide</h1><p>Add an image behind this overlay</p></div></body></html>`,
-                'blank': `<!DOCTYPE html><html><head><style>*{margin:0;padding:0;box-sizing:border-box;}body{min-height:100vh;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;align-items:center;justify-content:center;}</style></head><body><div style="padding:60px;text-align:center;"><h2 style="color:${theme.h2Color};font-size:32px;">Blank Slide</h2><p style="font-size:20px;margin-top:20px;">Add your content here</p></div></body></html>`
+                'title': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;align-items:center;justify-content:center;}.container{width:880px;max-width:880px;text-align:center;}h1{font-size:56px;margin-bottom:16px;color:${theme.h1Color};}p{font-size:24px;color:${theme.color};opacity:0.8;}</style></head><body><div class="container"><h1>Title Here</h1><p>Subtitle goes here</p></div></body></html>`,
+                'title-content': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;flex-direction:column;}.header{padding:35px 40px 0;}.header h2{font-size:36px;color:${theme.h2Color};border-bottom:3px solid ${theme.accent};padding-bottom:10px;display:inline-block;}.content{flex:1;display:flex;align-items:center;justify-content:center;padding:0 40px 35px;}.content-inner{width:880px;font-size:20px;line-height:1.8;}</style></head><body><div class="header"><h2>Slide Title</h2></div><div class="content"><div class="content-inner"><p>Content goes here</p></div></div></body></html>`,
+                'two-column': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;flex-direction:column;}.header{padding:35px 40px 0;}.header h2{font-size:36px;color:${theme.h2Color};border-bottom:3px solid ${theme.accent};padding-bottom:10px;display:inline-block;}.content{flex:1;display:flex;align-items:center;justify-content:center;padding:0 40px 35px;}.columns{width:880px;display:flex;gap:40px;}.column{flex:1;}.column h3{color:${theme.accent};margin-bottom:12px;}.column p{font-size:18px;line-height:1.6;}</style></head><body><div class="header"><h2>Two Column Slide</h2></div><div class="content"><div class="columns"><div class="column"><h3>Left Column</h3><p>Content here</p></div><div class="column"><h3>Right Column</h3><p>Content here</p></div></div></div></body></html>`,
+                'image-left': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;}.image-side{width:40%;display:flex;align-items:center;justify-content:center;background:#333;}.content-side{flex:1;display:flex;flex-direction:column;justify-content:center;padding:40px 40px 35px;max-width:560px;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}</style></head><body><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div></body></html>`,
+                'image-right': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;}.content-side{flex:1;display:flex;flex-direction:column;justify-content:center;padding:40px 40px 35px;max-width:560px;}.content-side h2{font-size:36px;margin-bottom:20px;color:${theme.h2Color};}.content-side p{font-size:20px;line-height:1.8;}.image-side{width:40%;display:flex;align-items:center;justify-content:center;background:#333;}</style></head><body><div class="content-side"><h2>Slide Title</h2><p>Content goes here</p></div><div class="image-side"><p style="color:#aaa;text-align:center;">Image</p></div></body></html>`,
+                'full-image': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:#333;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;}.overlay{padding:40px;max-width:880px;}.overlay h1{font-size:48px;margin-bottom:16px;}.overlay p{font-size:24px;opacity:0.9;}</style></head><body><div class="overlay"><h1>Full Image Slide</h1><p>Add an image behind this overlay</p></div></body></html>`,
+                'blank': `<!DOCTYPE html><html><head><style>${v}*{margin:0;padding:0;box-sizing:border-box;}body{width:960px;height:540px;overflow:hidden;font-family:'Segoe UI',sans-serif;background:${theme.background};color:${theme.color};display:flex;align-items:center;justify-content:center;}.container{width:880px;text-align:center;}</style></head><body><div class="container"><h2 style="color:${theme.h2Color};font-size:32px;">Blank Slide</h2><p style="font-size:20px;margin-top:20px;">Add your content here</p></div></body></html>`
             };
             const layoutHtml = layouts[layout] || layouts['blank'];
             state.slides[state.currentSlideIndex] = layoutHtml;
@@ -2095,6 +2251,11 @@ body { background: #111; overflow: hidden; }
     }
 
     let debounceTimer;
+    let footerDebounceTimer;
+    function debounceFooterLabel() {
+        clearTimeout(footerDebounceTimer);
+        footerDebounceTimer = setTimeout(applyFooterLabel, 600);
+    }
     function debounceUpdateSlide(value) {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
