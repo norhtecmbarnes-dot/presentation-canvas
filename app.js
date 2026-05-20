@@ -137,7 +137,11 @@ p{font-size:24px;color:#a0a0b0;}
         currentModel: '',
         currentView: 'preview',
         currentTheme: 'dark',
-        useLargePrompt: true
+        useLargePrompt: true,
+        brandProfiles: {},
+        currentBrandProfile: 'default',
+        _editableWrapper: null,
+        _brandCollapsed: false
     };
 
     function loadSettings() {
@@ -149,6 +153,76 @@ p{font-size:24px;color:#a0a0b0;}
 
     function saveSettings() {
         localStorage.setItem('canvas_settings', JSON.stringify(state.settings));
+    }
+
+    function loadBrandProfiles() {
+        try {
+            var saved = localStorage.getItem('canvas_brand_profiles');
+            if (saved) state.brandProfiles = JSON.parse(saved);
+        } catch (e) { state.brandProfiles = {}; }
+        if (!state.brandProfiles || Object.keys(state.brandProfiles).length === 0) {
+            state.brandProfiles = {
+                'default': { name: 'Default', company: '', tagline: '', address: '', phone: '', email: '', website: '', background: '' }
+            };
+        }
+        state.currentBrandProfile = localStorage.getItem('canvas_current_brand') || 'default';
+    }
+
+    function saveBrandProfiles() {
+        localStorage.setItem('canvas_brand_profiles', JSON.stringify(state.brandProfiles));
+        localStorage.setItem('canvas_current_brand', state.currentBrandProfile);
+    }
+
+    function loadBrandProfileIntoUI() {
+        var profile = state.brandProfiles[state.currentBrandProfile] || {};
+        document.getElementById('brand-company').value = profile.company || '';
+        document.getElementById('brand-tagline').value = profile.tagline || '';
+        document.getElementById('brand-address').value = profile.address || '';
+        document.getElementById('brand-phone').value = profile.phone || '';
+        document.getElementById('brand-email').value = profile.email || '';
+        document.getElementById('brand-website').value = profile.website || '';
+        document.getElementById('brand-background').value = profile.background || '';
+        refreshBrandProfileSelect();
+    }
+
+    function saveBrandProfileFromUI() {
+        var profile = state.brandProfiles[state.currentBrandProfile] || {};
+        profile.company = document.getElementById('brand-company').value.trim();
+        profile.tagline = document.getElementById('brand-tagline').value.trim();
+        profile.address = document.getElementById('brand-address').value.trim();
+        profile.phone = document.getElementById('brand-phone').value.trim();
+        profile.email = document.getElementById('brand-email').value.trim();
+        profile.website = document.getElementById('brand-website').value.trim();
+        profile.background = document.getElementById('brand-background').value.trim();
+        state.brandProfiles[state.currentBrandProfile] = profile;
+        saveBrandProfiles();
+    }
+
+    function refreshBrandProfileSelect() {
+        var select = document.getElementById('brand-profile-select');
+        select.innerHTML = '';
+        Object.keys(state.brandProfiles).forEach(function (key) {
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key;
+            select.appendChild(opt);
+        });
+        select.value = state.currentBrandProfile;
+    }
+
+    function getBrandContext() {
+        var profile = state.brandProfiles[state.currentBrandProfile];
+        if (!profile) return '';
+        var parts = [];
+        if (profile.company) parts.push('Company: ' + profile.company);
+        if (profile.tagline) parts.push('Tagline: ' + profile.tagline);
+        if (profile.address) parts.push('Address: ' + profile.address);
+        if (profile.phone) parts.push('Phone: ' + profile.phone);
+        if (profile.email) parts.push('Email: ' + profile.email);
+        if (profile.website) parts.push('Website: ' + profile.website);
+        if (profile.background) parts.push('Background: ' + profile.background);
+        if (parts.length === 0) return '';
+        return '\n\nBRAND VOICE — Use this company information throughout slides where relevant (contact slides, title slides, etc.):\n' + parts.join('\n');
     }
 
     function loadSessions() {
@@ -863,6 +937,7 @@ p{font-size:24px;color:#a0a0b0;}
         });
 
         state.currentModel = modelSelect.value;
+        checkSmallModelWarning();
     }
 
     async function sendToLLM(prompt, systemPrompt) {
@@ -1012,6 +1087,12 @@ p{font-size:24px;color:#a0a0b0;}
         if (/3b|4b|tiny|small|mini|nano|1b|2b|3\\.2b|3\\.1b|3-4b/.test(m)) return true;
         if (/gemma2|gemma-2|qwen2\\.5:3|phi|smollm|stablelm/.test(m)) return true;
         return false;
+    }
+
+    function checkSmallModelWarning() {
+        if (isSmallModel()) {
+            addSystemMessage('Small model detected. Complex features (Gantt charts, RACI matrices, risk matrices) will be text-only. For full capabilities, select a larger model or use the Research toggle for factual content.');
+        }
     }
 
     function getSlideSystemPrompt(mode) {
@@ -1658,7 +1739,7 @@ body { background: #111; overflow: hidden; }
             }
 
             const mode = document.getElementById('gen-mode-select').value;
-            let systemPrompt = getSlideSystemPrompt(mode) + getImageContext();
+            let systemPrompt = getSlideSystemPrompt(mode) + getImageContext() + getBrandContext();
 
             if (researchContext) {
                 systemPrompt += '\n\nRESEARCH DATA (use this factual information in your slides):\n' + researchContext;
@@ -2261,6 +2342,7 @@ body { background: #111; overflow: hidden; }
 
         document.getElementById('model-select').addEventListener('change', (e) => {
             state.currentModel = e.target.value;
+            checkSmallModelWarning();
         });
 
         document.getElementById('refresh-models-btn').addEventListener('click', refreshModels);
@@ -2481,6 +2563,52 @@ body { background: #111; overflow: hidden; }
                 addErrorMessage('Export module not loaded.');
             }
         });
+
+        document.getElementById('brand-voice-toggle').addEventListener('click', function () {
+            state._brandCollapsed = !state._brandCollapsed;
+            var body = document.getElementById('brand-voice-body');
+            var arrow = document.getElementById('brand-voice-arrow');
+            body.classList.toggle('collapsed', state._brandCollapsed);
+            arrow.innerHTML = state._brandCollapsed ? '&#9660;' : '&#9650;';
+        });
+
+        document.getElementById('brand-profile-select').addEventListener('change', function () {
+            state.currentBrandProfile = this.value;
+            localStorage.setItem('canvas_current_brand', this.value);
+            loadBrandProfileIntoUI();
+        });
+
+        document.getElementById('brand-save-btn').addEventListener('click', function () {
+            saveBrandProfileFromUI();
+            addSystemMessage('Brand profile "' + state.currentBrandProfile + '" saved.');
+        });
+
+        document.getElementById('brand-new-btn').addEventListener('click', function () {
+            var name = prompt('Enter new profile name:');
+            if (!name) return;
+            if (state.brandProfiles[name]) {
+                addErrorMessage('Profile "' + name + '" already exists.');
+                return;
+            }
+            state.brandProfiles[name] = { name: name, company: '', tagline: '', address: '', phone: '', email: '', website: '', background: '' };
+            state.currentBrandProfile = name;
+            saveBrandProfiles();
+            loadBrandProfileIntoUI();
+            addSystemMessage('Created brand profile: ' + name);
+        });
+
+        document.getElementById('brand-delete-btn').addEventListener('click', function () {
+            var keys = Object.keys(state.brandProfiles);
+            if (keys.length <= 1) {
+                addErrorMessage('Cannot delete the last profile.');
+                return;
+            }
+            delete state.brandProfiles[state.currentBrandProfile];
+            state.currentBrandProfile = Object.keys(state.brandProfiles)[0];
+            saveBrandProfiles();
+            loadBrandProfileIntoUI();
+            addSystemMessage('Brand profile deleted.');
+        });
     }
 
     let debounceTimer;
@@ -2501,6 +2629,7 @@ body { background: #111; overflow: hidden; }
         loadSettings();
         loadSessions();
         loadLogo();
+        loadBrandProfiles();
         if (state.sessions.length === 0) {
             createSession('Welcome Presentation');
         } else {
@@ -2526,6 +2655,7 @@ body { background: #111; overflow: hidden; }
         initEventListeners();
         setMode('generate');
         renderTemplateButtons();
+        loadBrandProfileIntoUI();
         loadExternalTemplates();
         addSystemMessage('Welcome to Presentation Canvas! Select a model and describe your presentation, or choose a template.');
     }

@@ -73,11 +73,62 @@
                     <input type="number" id="max-slides-input" min="1" max="50" value="10" style="width:40px;" title="Maximum number of slides">
                 </div>
                 <div id="label-bar">
-                    <label>Footer Label:</label>
-                    <input type="text" id="footer-label-input" placeholder="e.g. Company Sensitive, CUI, Do Not Distribute" style="flex:1;">
-                    <label style="margin-left:8px;">
-                        <input type="checkbox" id="show-slide-numbers" checked> Show Slide Numbers
-                    </label>
+                    <div class="label-row">
+                        <label>Footer Label:</label>
+                        <input type="text" id="footer-label-input" placeholder="e.g. Company Sensitive, CUI, Do Not Distribute" style="flex:1;">
+                    </div>
+                    <div class="label-row">
+                        <label>
+                            <input type="checkbox" id="show-slide-numbers" checked> Show Slide Numbers
+                        </label>
+                    </div>
+                </div>
+                <div id="brand-voice-bar">
+                    <div class="brand-voice-header" id="brand-voice-toggle">
+                        <span>Brand Voice</span>
+                        <span id="brand-voice-arrow">&#9650;</span>
+                    </div>
+                    <div id="brand-voice-body">
+                        <div class="brand-voice-row">
+                            <label>Profile:</label>
+                            <select id="brand-profile-select">
+                                <option value="default">Default</option>
+                            </select>
+                            <button id="brand-save-btn" title="Save current profile">Save</button>
+                            <button id="brand-delete-btn" title="Delete current profile" style="color:var(--danger);">Delete</button>
+                            <button id="brand-new-btn" title="New profile">+ New</button>
+                        </div>
+                        <div class="brand-voice-fields">
+                            <div class="brand-field">
+                                <label>Company Name:</label>
+                                <input type="text" id="brand-company" placeholder="Acme Corp">
+                            </div>
+                            <div class="brand-field">
+                                <label>Tagline:</label>
+                                <input type="text" id="brand-tagline" placeholder="Innovating the future">
+                            </div>
+                            <div class="brand-field">
+                                <label>Address:</label>
+                                <input type="text" id="brand-address" placeholder="123 Main St, City, State">
+                            </div>
+                            <div class="brand-field">
+                                <label>Phone:</label>
+                                <input type="text" id="brand-phone" placeholder="(555) 123-4567">
+                            </div>
+                            <div class="brand-field">
+                                <label>Email:</label>
+                                <input type="text" id="brand-email" placeholder="contact@company.com">
+                            </div>
+                            <div class="brand-field">
+                                <label>Website:</label>
+                                <input type="text" id="brand-website" placeholder="www.company.com">
+                            </div>
+                            <div class="brand-field brand-field-full">
+                                <label>Background / About:</label>
+                                <textarea id="brand-background" rows="3" placeholder="Brief company background, mission, values, key products or services..."></textarea>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div id="chat-input-area">
                     <textarea id="chat-input" placeholder="Describe your presentation..." rows="3"></textarea>

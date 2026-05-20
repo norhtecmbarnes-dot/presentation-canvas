@@ -1209,17 +1209,24 @@ body {
 }
 
 #label-bar {
-    padding: 6px 12px;
+    padding: 8px 12px;
     border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+}
+
+#label-bar .label-row {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 12px;
 }
 
 #label-bar label {
     color: var(--text-secondary);
     white-space: nowrap;
+    font-size: 11px;
 }
 
 #footer-label-input {
@@ -1234,6 +1241,109 @@ body {
 #footer-label-input::placeholder {
     color: var(--text-secondary);
     opacity: 0.6;
+}
+
+#brand-voice-bar {
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+}
+
+.brand-voice-header {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 13px;
+    user-select: none;
+}
+
+.brand-voice-header:hover {
+    background: rgba(79,195,247,0.05);
+}
+
+#brand-voice-body {
+    padding: 0 12px 8px;
+}
+
+#brand-voice-body.collapsed {
+    display: none;
+}
+
+.brand-voice-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.brand-voice-row select {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12px;
+    flex: 1;
+}
+
+.brand-voice-row button {
+    background: var(--bg-tertiary);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.brand-voice-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.brand-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.brand-field label {
+    color: var(--text-secondary);
+    min-width: 75px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.brand-field input,
+.brand-field textarea {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 11px;
+    flex: 1;
+}
+
+.brand-field-full {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+}
+
+.brand-field-full label {
+    min-width: auto;
+}
+
+.brand-field-full textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: inherit;
 }
 
 #chat-regenerate-btn {

@@ -2,7 +2,7 @@
 
 **Privacy-first AI slide builder for government proposals, business pitches, and professional presentations. Runs locally with Ollama — your data never leaves your machine.**
 
-![Version](https://img.shields.io/badge/version-3.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple) ![Ollama](https://img.shields.io/badge/ollama-compatible-brightgreen)
+![Version](https://img.shields.io/badge/version-4.0-blue) ![License](https://img.shields.io/badge/license-MIT-green) ![No Backend Required](https://img.shields.io/badge/backend-none-orange) ![Browser Only](https://img.shields.io/badge/platform-browser-purple) ![Ollama](https://img.shields.io/badge/ollama-compatible-brightgreen)
 
 > **Keywords:** AI presentation generator, slide builder, Ollama slides, local AI, privacy-first, government proposal, RFP response, quad chart, RACI matrix, Gantt chart, SWOT analysis, KPI dashboard, risk matrix, PPTX export, PDF export, no-cloud, offline presentation, LLM slide generator, browser-based presentation tool, AI-powered slides, open-source presentation maker, self-hosted slides
 
