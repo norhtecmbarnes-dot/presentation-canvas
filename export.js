@@ -215,7 +215,7 @@ body { background: #333; }
             stops = stops.filter(function (s) {
                 return /#|rgb|hsl/.test(s);
             });
-            if (stops.length >= 2) return 'background: ' + stops[1];
+            if (stops.length >= 2) return 'background: ' + stops[0];
             if (stops.length === 1) return 'background: ' + stops[0];
             return match;
         });

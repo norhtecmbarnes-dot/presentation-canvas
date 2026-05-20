@@ -483,7 +483,7 @@ body {
 .slide-thumb iframe {
     width: 960px;
     height: 540px;
-    transform: scale(0.0833);
+    transform: scale(0.0833333333);
     transform-origin: top left;
     pointer-events: none;
     border: none;
@@ -501,7 +501,7 @@ body {
 #slide-preview-area {
     width: var(--slide-width);
     height: var(--slide-height);
-    background: var(--slide-bg);
+    background: transparent;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     overflow: hidden;
