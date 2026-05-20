@@ -1,4 +1,4 @@
-# Presentation Canvas
+# Presentation Canvas v4.0
 
 **Privacy-first AI slide builder for government proposals, business pitches, and professional presentations. Runs locally with Ollama — your data never leaves your machine.**
 
@@ -20,20 +20,19 @@
 
 ## Why Presentation Canvas?
 
-Unlike most presentation tools that send your data to cloud servers, Presentation Canvas runs on **local models via Ollama** — your data never leaves your computer. It also works with foundational models (OpenAI, Zhipu/GLM, or any OpenAI-compatible API) when you need them. This gives you far more control over your slides than other programs: you pick the model, the theme, the layout, and every detail of the output.
+Unlike most presentation tools that send your data to cloud servers, Presentation Canvas runs on **local models via Ollama** — your data never leaves your computer. It also works with foundation models (OpenAI, Zhipu/GLM, or any OpenAI-compatible API) when you need them.
 
 Government bids demand specific formats — quad charts, RACI matrices, Gantt timelines, cost breakdowns. These are painful to build by hand. Presentation Canvas generates them from a single prompt using AI.
 
 - **Privacy-first** — Runs on local models so your data never leaves your computer. No cloud, no accounts, no tracking.
-- **Built on Ollama** — First-class support for local LLMs. Works out of the box with any Ollama model.
-- **Foundation models too** — Connect to OpenAI, Zhipu (GLM), or any OpenAI-compatible endpoint when you need more power.
-- **More control than other slide programs** — You choose the theme, layout, max slides, footer labels, and every detail. The AI works for you, not the other way around.
+- **Research mode** — The LLM can research your topic before generating slides, pulling in real facts, data, and statistics.
+- **Brand Voice profiles** — Save company name, address, contact info, and background. Injected into every slide generation.
+- **WYSIWYG editor** — Click directly on text in slides to edit inline. No code required.
+- **Tool commands** — Add/delete/move slides with natural language in Edit mode.
+- **More control than other slide programs** — You choose the theme, layout, max slides, footer labels, and every detail.
 - **No server required** — Open `index.html` and start. All processing happens in-browser.
-- **Government-ready slides** — Auto-detects bid/proposal keywords and enforces concise, evaluator-friendly formatting.
-- **Edit in Canvas, deliver as PDF** — Create here, export PDF for submission or PPTX for live briefings.
+- **Small model awareness** — Detects small/lightweight models and warns when complex charts won't render correctly.
 - **Session history** — Every presentation auto-archived. Switch between decks instantly.
-- **Smart Layout Engine** — Every slide is perfectly centered with safe margins, proper header/footer zones, and CSS variables for consistent formatting.
-- **Risk Matrix** — Generate color-coded 5×5 risk assessment matrices from a single prompt.
 
 ---
 
@@ -42,68 +41,48 @@ Government bids demand specific formats — quad charts, RACI matrices, Gantt ti
 ### Core
 
 - **Multi-Provider LLM** — Ollama (local), OpenAI, Zhipu (GLM), or any OpenAI-compatible API
-- **Three Generation Modes** — Script, Slides, or Markdown
-- **Edit Mode** — AI-powered edits on individual slides
-- **Preview / HTML Toggle** — Rendered view or raw HTML editing
+- **Three Generation Modes** — Script, Slides, or Markdown format
+- **Three Views** — Preview (rendered), Edit (WYSIWYG inline editing), HTML (raw code)
+- **Research toggle** — Let the LLM research your topic before generating for factual, data-rich slides
+- **Brand Voice** — Saved profiles with company name, address, contact, background — auto-injected into prompts
+- **Tool Commands** — "add a slide about X after slide 3", "delete slide 2", "move slide 4 to position 1" in Edit mode
 - **5 Professional Themes** — Dark, Light, Blue, Green, Red (applies live to all slides)
-- **7 Built-in Layouts** — Title, Title+Content, Two Column, Image Left/Right, Full Image, Blank
-- **Smart Slide Layout Engine** — Automatic centering, safe margins (40px sides, 35px top/bottom), header/content/footer zones, CSS variables for consistent formatting across all slides
+- **Smart Layout Engine** — Automatic centering, safe margins, header/content/footer zones, CSS variables
+- **Footer Labels** — Auto-inject classification labels (CUI, Company Sensitive, etc.) into every slide
+- **Small model detection** — Warns if your model is too small for complex charts, offers research mode as fallback
+- **Optional slide numbers** — Checkbox to include or suppress "Slide N" numbering on content slides
 
-### Smart Slide Layout Engine
+### Chart & Matrix Generation (Keyword-Triggered)
 
-Every generated slide follows these permanent layout rules:
-
-| Rule | Detail |
-|------|--------|
-| **Slide dimensions** | 960×540px (16:9, U.S. Letter) |
-| **CSS variables** | `--slide-width`, `--slide-height`, `--safe-margin`, `--header-height`, `--footer-height` defined in every `:root` |
-| **Safe margins** | 40px left/right, 35px top/bottom minimum |
-| **Header zone** | Top 80–100px for titles and subtitles |
-| **Content zone** | Vertically centered between header and footer |
-| **Footer zone** | Bottom 35–45px for slide numbers and classification labels |
-| **Centering** | Title slides: centered in full height. Content slides: centered between header and footer |
-| **Overflow prevention** | `max-width: 880px` on content, `line-height: 1.5–1.8`, 6–7 lines max per slide |
-| **Format awareness** | A4 or Letter defaults; 16:9 ratio maintained unless user specifies print layout |
-
-### Global Keyword Trigger System
-
-All special slide types and chart modes trigger **globally** — in any generation mode (Generate, Edit, Script, Markdown) — not just in Government Bid Mode. Multiple features can be combined in one deck.
+All special chart types trigger **globally** — in any generation mode. Multiple features can combine in one deck.
 
 | Keyword(s) | Generated Feature |
 |---|---|
-| "gov bid", "proposal", "compact bid", "RFP", "government" | Government Bid Mode (dark navy theme, max 5 slides, corporate sensitive footer, auto-includes relevant charts) |
+| "gov bid", "proposal", "RFP", "government" | Government Bid Mode (dark navy, 5 slides, auto-charts) |
 | "quad chart", "quadrant", "2x2" | Quad Chart (2×2 grid with titled quadrants) |
-| "Gantt", "project schedule", "timeline chart", "milestone chart", "project plan" | Gantt Chart (SVG horizontal bar chart) |
-| "RACI", "responsibility matrix", "who does what", "team roles", "work assignment" | RACI Matrix (color-coded responsibility table) |
-| "cost", "budget", "pricing", "financials", "cost breakdown" | Cost / Pricing Table (with grand total) |
-| "bar chart", "column chart", "comparison", "survey", "results" | Bar / Column Chart (SVG) |
-| "pie chart", "donut chart", "percentage", "breakdown", "proportion" | Pie / Donut Chart (SVG + legend) |
+| "Gantt", "project schedule", "timeline chart", "project plan" | Gantt Chart (SVG horizontal bar chart) |
+| "RACI", "responsibility matrix", "who does what" | RACI Matrix (color-coded responsibility table) |
+| "cost", "budget", "pricing", "financials" | Cost / Pricing Table (with grand total) |
+| "bar chart", "column chart", "comparison" | Bar / Column Chart (SVG) |
+| "pie chart", "donut chart", "percentage", "breakdown" | Pie / Donut Chart (SVG + legend) |
 | "SWOT", "strengths weaknesses", "strategic" | SWOT Analysis (2×2 color-coded quadrants) |
 | "KPI", "dashboard", "metrics", "scorecard" | KPI Dashboard (4-card metric grid with deltas) |
-| "org chart", "organization chart", "reporting structure", "hierarchy" | Org Chart (flexbox hierarchy with SVG connectors) |
-| "comparison table", "feature comparison", "vs" | Feature Comparison Table (check/cross indicators) |
-| "timeline", "roadmap" | Horizontal Timeline (SVG milestones with dates) |
-| "risk matrix", "risk assessment" | Risk Matrix (color-coded 5×5 probability vs. impact grid) |
-
-### Session & Organization
-
-- **Session Sidebar** — Auto-pins previous presentations when starting a new one. Pin/unpin sessions with ★, clear all unpinned in one click, double-click to rename any session. Sidebar state persists across reloads.
-- **Template Import** — Import from clipboard or file with auto-detection of JSON, HTML, or Markdown. Includes a copy-pasteable LLM prompt for generating templates via Gemini, ChatGPT, or any AI. Validates slide quality on import.
-- **Max Slides** — Number input in the mode bar controls deck length before generation.
-- **Footer Label** — Add "CUI", "Company Sensitive", "Do Not Distribute" labels to every slide. Labels are auto-injected into all slides when typed, and included in the LLM prompt during generation and editing.
-- **Logo System** — Upload once, pick position and size, apply to all slides with one click.
-- **Image Upload** — Upload images and insert into specific slides with "To Slide N" button.
-- **HTML Download** — Download any session as a standalone viewer HTML file.
+| "org chart", "organization chart", "hierarchy" | Org Chart (flexbox hierarchy) |
+| "comparison table", "feature comparison", "vs" | Feature Comparison Table |
+| "timeline", "roadmap" | Horizontal Timeline (SVG milestones) |
+| "risk matrix", "risk assessment" | Risk Matrix (5×5 color-coded grid) |
 
 ### Export
 
-- **PDF** — Print-optimized with landscape layout and background color support
-- **PPTX** — Each slide rendered as a high-fidelity image inside a PowerPoint deck. Full visual fidelity, not text-editable. Uses html2canvas with solid-color rendering for reliability.
+- **PDF** — Print-optimized, landscape layout, background graphics support
+- **PPTX (Image)** — High-fidelity screenshots of each slide. Pixel-perfect visual fidelity.
+- **PPTX (Editable)** — Native text boxes, bullet lists, tables. Text remains editable in PowerPoint.
 - **Template Import/Export** — JSON, HTML, Markdown, or clipboard with auto-detection
+- **HTML Download** — Download any session as a standalone viewer HTML file
 
 ### Presentation
 
-- **Full-screen Mode** — Keyboard navigation with arrow keys, spacebar, and escape
+- **Full-screen Present mode** — Slides scale to fill the entire screen, keyboard navigation (arrows, space, escape)
 - **Streamed Generation** — Slides appear one at a time as the AI generates them
 
 ---
@@ -118,17 +97,17 @@ All special slide types and chart modes trigger **globally** — in any generati
 ### 2. Pull a Model (Ollama)
 
 ```bash
-ollama pull llama3      # General purpose (recommended — fast, capable)
+ollama pull llama3      # General purpose (recommended)
 ollama pull mistral     # Fast, capable
-ollama pull glm4        # Excellent for structured output
+ollama pull gemma3      # Modern, strong reasoning
 ```
 
-> **Small models** (tiny, phi, gemma2:2b, 3B-4B models) will work but get a simplified prompt to fit within their context window. They can produce clean text slides but will rarely produce complex SVG charts (Gantt, pie, etc.). For charts and rich formatting, use 7B+ models.
+> **Small models** (tiny, phi, gemma2:2b, 3B-4B models) will be detected automatically. You'll see a warning that complex SVG charts (Gantt, pie, risk matrices) may not render. They can still produce clean text-only slides. For full capabilities, use 7B+ models.
 
 ### 3. Launch
 
 ```bash
-cd canvas
+cd C:\ai\canvas
 
 # Option A: Just open index.html in your browser
 
@@ -157,28 +136,52 @@ python -m http.server 8080
 ### Generate a Presentation
 
 1. Choose **Generate** mode
-2. Pick **Script**, **Slides**, or **Markdown** format
-3. Set **Max Slides** if you want to limit the deck length
-4. Type your request:
+2. Optionally check **Research** — the LLM will gather facts about your topic first
+3. Pick **Script**, **Slides**, or **Markdown** format
+4. Set **Max Slides** if you want to limit the deck length (default: 10)
+5. Type your request:
    - *"Create a 5-slide government bid deck for a cybersecurity contract"*
    - *"Make a quad chart for our cloud migration proposal"*
    - *"Build a Gantt chart slide for project timeline Q3-Q4"*
    - *"Generate a RACI matrix for the development team"*
    - *"Create a risk matrix for our compliance review"*
    - *"Build a presentation with a Gantt chart, RACI, and pricing table"*
-5. Slides stream in one at a time as the AI generates them
+6. Slides stream in one at a time
 
-### Edit a Slide
+### Brand Voice
+
+Expand the **Brand Voice** section above the chat to set up company details:
+
+1. Fill in company name, tagline, address, phone, email, website, and background
+2. Click **Save** to persist the profile
+3. Create multiple profiles (+ New) for different contexts
+4. Switch between profiles using the dropdown
+5. Brand details are automatically injected into every slide generation prompt
+
+### Edit a Slide (AI)
 
 1. Switch to **Edit** mode (button highlights orange)
-2. Select the slide
+2. Select the slide you want to modify
 3. Describe changes: *"Add a cost breakdown table"*, *"Change background to navy blue"*, *"Make the title larger"*
+
+### Edit a Slide (WYSIWYG)
+
+1. Click the **Edit** view button (middle button in the workspace toolbar)
+2. Click directly on any text in the slide
+3. Type to modify
+4. Switch back to Preview or HTML view — changes auto-save
+
+### Tool Commands (Edit Mode)
+
+In Edit mode, type any of these natural language commands:
+- **"add a slide about team structure after slide 3"** — inserts a new slide
+- **"delete slide 2"** — removes a slide
+- **"move slide 4 to position 1"** — reorders slides
 
 ### Apply a Theme
 
 1. Select a theme from the **Theme** dropdown (Dark, Light, Blue, Green, Red)
 2. All existing slides update immediately
-3. The theme also informs the AI when generating new slides
 
 ### Logo
 
@@ -186,20 +189,17 @@ python -m http.server 8080
 2. Choose position (top-left, top-right, bottom-left, bottom-right)
 3. Choose size (Small, Medium, Large)
 4. Click **Apply** — logo appears on every slide
-5. Click **Remove** to strip it from all slides
 
 ### Footer Labels
 
-Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive", "Do Not Distribute"). Labels are:
-- **Auto-injected** into every slide as a subtle `<div>` at the bottom-right
-- **Included in the LLM prompt** during both generation and editing
-- **Debounced** — updates all slides 600ms after you stop typing
+Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive"). Labels auto-inject into every slide. Use the **Show Slide Numbers** checkbox to include or suppress "Slide N" numbering.
 
 ### Export
 
-- **PDF** — Click Export > PDF. Set margins to "None" and enable "Background Graphics" for dark themes.
-- **PPTX** — Click Export > PPTX. Each slide becomes a high-res image in the PowerPoint deck. Use for live presentations, not for text editing.
-- **HTML** — Click the download arrow on any session in the sidebar.
+- **PDF** — Set margins to "None" and enable "Background Graphics" for dark themes
+- **PPTX (Image)** — Pixel-perfect screenshots for final delivery
+- **PPTX (Editable)** — Native text boxes and tables for content editing in PowerPoint
+- **HTML** — Click the download arrow on any session in the sidebar
 
 ---
 
@@ -215,6 +215,66 @@ Type in the **Footer Label** field (e.g. "CUI", "Company Sensitive", "Do Not Dis
 
 ---
 
+## Test Script
+
+Paste these one at a time into the chat panel to test various features:
+
+```
+Create a SWOT analysis for launching a drone delivery service
+```
+```
+Build a Gantt chart for a 6-month software product launch
+```
+```
+Create a RACI matrix for a cross-functional DevOps team
+```
+```
+Generate a KPI dashboard showing revenue, users, churn, and conversion
+```
+```
+Create a 5x5 risk matrix for a cloud migration project
+```
+```
+Create a compact bid proposal for a cybersecurity audit contract
+```
+```
+Create a 5-slide investor pitch for an AI-powered logistics startup
+```
+
+**Research mode:** Check the **Research** checkbox first:
+```
+Create a presentation on the current state of nuclear fusion energy
+```
+
+**Edit mode tool commands:** Switch to Edit mode:
+```
+add a slide about team org chart after slide 3
+```
+```
+delete slide 2
+```
+
+---
+
+## How It Compares to Commercial Solutions
+
+Commercial AI slide tools (Gamma, Beautiful.ai, Tome, Canva AI) share a common approach: generate from templates with limited user control. Presentation Canvas takes a fundamentally different path:
+
+| Capability | Commercial Tools | Presentation Canvas |
+|---|---|---|
+| **Arbitrary chart generation** | Manual creation only | Auto-generates RACI, Gantt, SWOT, KPI, risk matrices from keywords |
+| **Research before generation** | No — generic filler content | Yes — LLM researches topic, injects real data |
+| **Privacy / data handling** | Cloud processing, data leaves your machine | Local-first (Ollama), data never leaves |
+| **No account / no cost** | Subscription required | Free, open-source, no account needed |
+| **Control granularity** | Fixed templates and guardrails | Full HTML/CSS control, editable at any level |
+| **Government/enterprise ready** | Vendor lock-in, cloud dependency | Self-hosted, offline-capable, no external dependencies |
+| **Multi-model support** | Single proprietary model | Ollama (any local model), OpenAI, Zhipu, custom APIs |
+| **Brand voice persistence** | Limited or none | Multiple saved profiles, auto-injected into every prompt |
+| **WYSIWYG slide editing** | Some support | Click-to-edit directly on slides, no code required |
+| **Vendor lock-in** | Yes — export only | Open format (HTML), full export to PDF/PPTX/HTML |
+
+---
+
 ## Project Structure
 
 ```
@@ -222,7 +282,7 @@ canvas/
 ├── index.html      # Main application UI
 ├── styles.css      # Dark theme, layout, components
 ├── app.js          # Core logic: LLM, sessions, slides, prompts, layout engine
-├── export.js       # PDF and PPTX export
+├── export.js       # PDF, PPTX (image), PPTX (editable), HTML export
 ├── templates.json  # External templates
 ├── samples/        # Sample presentations
 └── README.md       # This file
@@ -236,27 +296,38 @@ canvas/
 |---------|----------|
 | Ollama models not loading | Run `ollama serve`, check URL in Settings, click Refresh |
 | Slides not generating | Verify model is selected, try a different generation mode |
+| Small model warning on charts | Use a 7B+ model for SVG charts (Gantt, pie, risk matrices) |
+| Controls clipped in chat bar | Mode bar now wraps to multiple rows — resize or use a wider window |
+| Present mode doesn't fill screen | Fixed in v4.0 — slides now scale to fit the entire viewport |
+| PPTX (Editable) looks rough | HTML flexbox/grid layouts don't map 1:1 to PowerPoint. Use PPTX (Image) for visual fidelity, or edit in the browser first. |
 | Theme not applying to slides | Select theme from dropdown — it updates all existing slides live |
 | CORS errors with custom APIs | Endpoint must support CORS headers, or use a proxy |
 | Dark theme not showing in PDF | Enable "Background Graphics" in browser print dialog |
-| PPTX looks wrong | PPTX exports slides as images — edit in Canvas, not PowerPoint |
 | Images too large | Resize images before uploading — they're embedded as base64 |
-| Edit mode not working | Make sure you click the Edit button (highlights orange) and a slide is selected |
-| Footer labels not appearing | Type in the Footer Label field — it auto-injects into all slides after 600ms |
-| Slides not centered | All new slides use the Smart Layout Engine with CSS variables and safe margins |
+| Footer labels not appearing | Type in Footer Label field — auto-injects after 600ms |
 
 ---
 
 ## Changelog
 
+### v4.0
+
+- **Research mode** — LLM researches topic before generating for factual, data-rich slides
+- **Brand Voice profiles** — Multiple saved profiles with company name, address, contact, background
+- **WYSIWYG editor** — Click-to-edit text directly on slides (third view button: Edit)
+- **Tool commands** — "add a slide about X after slide N", "delete slide N", "move slide N to position M"
+- **Small model awareness** — Warns when model is too small for complex SVG charts
+- **PPTX (Editable) export** — Native text boxes, bullet lists, tables (text editable in PowerPoint)
+- **Presentation scaling** — Present mode now fills the entire screen
+- **Default max slides** — Set to 10
+- **Label bar layout fix** — Show Slide Numbers checkbox no longer clips
+
 ### v3.0
 
-- **Smart Slide Layout Engine** — Every slide now uses CSS variables (`--slide-width`, `--slide-height`, `--safe-margin`, `--header-height`, `--footer-height`) for consistent centering, safe margins, and proper header/content/footer zones
-- **Global Keyword Trigger System** — All chart types and special modes now trigger globally in any generation mode (Generate, Edit, Script, Markdown), not just in Government Bid Mode
-- **Risk Matrix** — New chart type triggered by "risk matrix" or "risk assessment" — generates a color-coded 5×5 probability vs. impact grid
-- **Expanded trigger keywords** — Added "column chart", "donut chart", "cost breakdown", "responsibility matrix", "work assignment", "organization chart", "feature comparison", "scorecard", "timeline chart", "milestone chart"
-- **Footer labels** — Now auto-injected into all slides when typed (debounced 600ms), and included in edit mode prompts
-- **Edit mode fix** — Edit button now correctly highlights orange when active
+- Smart Slide Layout Engine with CSS variables and safe margins
+- Global Keyword Trigger System — charts trigger in any generation mode
+- Risk Matrix, expanded trigger keywords
+- Footer labels auto-injected into all slides
 
 ### v2.2
 
