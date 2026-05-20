@@ -1881,6 +1881,9 @@ body { background: #111; overflow: hidden; }
     }
 
     function switchView(view) {
+        if (state.currentView === 'edit' && view !== 'edit') {
+            saveWysiwygEdits();
+        }
         state.currentView = view;
         const previewArea = document.getElementById('slide-preview-area');
         const htmlArea = document.getElementById('slide-html-area');
@@ -1894,12 +1897,117 @@ body { background: #111; overflow: hidden; }
             previewArea.style.display = 'none';
             htmlArea.style.display = '';
             applyBtn.style.display = '';
-            document.getElementById('slide-html-editor').value = state.slides[state.currentSlideIndex] || '';
+            if (state.slides[state.currentSlideIndex]) {
+                document.getElementById('slide-html-editor').value = state.slides[state.currentSlideIndex];
+            }
+        } else if (view === 'edit') {
+            previewArea.style.display = '';
+            htmlArea.style.display = 'none';
+            applyBtn.style.display = 'none';
+            renderWysiwygView();
         } else {
             previewArea.style.display = '';
             htmlArea.style.display = 'none';
             applyBtn.style.display = 'none';
+            renderSlidePreview();
         }
+    }
+
+    function renderWysiwygView() {
+        var previewArea = document.getElementById('slide-preview-area');
+        if (state.slides.length === 0) {
+            previewArea.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:18px;">No slides yet.</div>';
+            return;
+        }
+        var slideHtml = state.slides[state.currentSlideIndex] || DEFAULT_SLIDE_HTML;
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(slideHtml, 'text/html');
+        var styleEl = doc.querySelector('style');
+        var css = styleEl ? styleEl.textContent : '';
+        var bodyEl = doc.querySelector('body');
+
+        css = gradientToSolid(css);
+        css = css.replace(/(^|[\s{}>,+~])body(?=[\s{}:,.\[#])/gm, '$1.editable-slide');
+        css = css.replace(/(^|[\s{}>,+~])html(?=[\s{}:,.\[#])/gm, '$1.editable-slide');
+        css = css.replace(/min-height\s*:\s*100vh/gi, 'height:540px');
+        css = css.replace(/height\s*:\s*100vh/gi, 'height:540px');
+        css = css.replace(/var\(--slide-height\)/g, '540px');
+        css = css.replace(/var\(--slide-width\)/g, '960px');
+
+        previewArea.innerHTML = '';
+        var wrapper = document.createElement('div');
+        wrapper.className = 'editable-slide';
+        wrapper.contentEditable = 'true';
+        wrapper.spellcheck = false;
+        wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;outline:none;margin:0 auto;';
+        if (bodyEl) {
+            var bodyInline = bodyEl.getAttribute('style') || '';
+            wrapper.style.cssText += bodyInline;
+        }
+        var scopedStyle = document.createElement('style');
+        scopedStyle.textContent = css;
+        wrapper.appendChild(scopedStyle);
+        if (bodyEl) {
+            wrapper.innerHTML += bodyEl.innerHTML;
+        }
+        previewArea.appendChild(wrapper);
+        state._editableWrapper = wrapper;
+        document.getElementById('slide-html-editor').value = slideHtml;
+    }
+
+    function saveWysiwygEdits() {
+        if (!state._editableWrapper) return;
+        var wrapper = state._editableWrapper;
+        wrapper.contentEditable = 'false';
+        var slideHtml = state.slides[state.currentSlideIndex];
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(slideHtml, 'text/html');
+        var bodyEl = doc.querySelector('body');
+        if (bodyEl) {
+            var styleEl = wrapper.querySelector('style');
+            if (styleEl) styleEl.remove();
+            bodyEl.innerHTML = wrapper.innerHTML;
+            state.slides[state.currentSlideIndex] = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+            saveCurrentSession();
+            renderThumbnails();
+        }
+        state._editableWrapper = null;
+    }
+
+    function gradientToSolid(css) {
+        return css.replace(/background(?:-image)?\s*:\s*linear-gradient\s*\(/g, function () {
+            var depth = 1;
+            var i = arguments[arguments.length - 2] + arguments[0].length;
+            var start = i;
+            while (i < css.length && depth > 0) {
+                if (css[i] === '(') depth++;
+                else if (css[i] === ')') depth--;
+                i++;
+            }
+            var content = css.substring(start, i - 1);
+            var stops = [];
+            var d = 0, s = 0;
+            for (var j = 0; j < content.length; j++) {
+                if (content[j] === '(') d++;
+                else if (content[j] === ')') d--;
+                else if (content[j] === ',' && d === 0) {
+                    stops.push(content.substring(s, j).trim());
+                    s = j + 1;
+                }
+            }
+            stops.push(content.substring(s).trim());
+            stops = stops.filter(function (stop) { return /#|rgb|hsl/.test(stop); });
+            if (stops.length >= 1) {
+                var color = stops[0].match(/#[0-9a-fA-F]{3,8}/);
+                if (color) return 'background: ' + color[0];
+                var hex = stops[0].match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+                if (hex) {
+                    var r = parseInt(hex[1]), g = parseInt(hex[2]), b = parseInt(hex[3]);
+                    return 'background: #' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+                }
+            }
+            return 'background: #1a1a2e';
+        });
     }
 
     function startPresentation() {
