@@ -631,6 +631,79 @@ p{font-size:24px;color:#a0a0b0;}
         }
     }
 
+    async function doResearch(topic) {
+        var model = state.currentModel || document.getElementById('model-select').value;
+        if (!model) {
+            addErrorMessage('No model selected for research.');
+            return '';
+        }
+        addSystemMessage('Researching: ' + topic);
+        try {
+            var researchPrompt = 'Research the following topic thoroughly and provide a detailed summary with key facts, statistics, dates, names, and data that would be useful for a presentation. Be factual and specific.\n\nTopic: ' + topic;
+            var response = await fetch(state.settings.ollamaUrl + '/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model, prompt: researchPrompt, stream: false }),
+                signal: AbortSignal.timeout(60000)
+            });
+            if (!response.ok) throw new Error('Research request failed');
+            var data = await response.json();
+            var result = data.response || '';
+            if (result) {
+                addSystemMessage('Research complete (' + result.length + ' chars gathered)');
+            }
+            return result;
+        } catch (e) {
+            console.warn('Research failed:', e);
+            addSystemMessage('Research skipped (could not fetch data). Continuing without research.');
+            return '';
+        }
+    }
+
+    function handleToolCommand(prompt) {
+        var addMatch = prompt.match(/add\s+(?:a\s+)?(?:new\s+)?slide\s+about\s+(.+?)\s+after\s+(?:slide\s+)?(\d+)/i);
+        if (addMatch) {
+            var topic = addMatch[1].replace(/[.?]$/, '').trim();
+            var position = parseInt(addMatch[2]);
+            if (position < 0 || position > state.slides.length) {
+                addErrorMessage('Invalid slide position: ' + position + '. Slides go from 1 to ' + state.slides.length + '.');
+                return true;
+            }
+            var t = SLIDE_THEMES[state.currentTheme];
+            var newSlide = '<!DOCTYPE html><html><head><style>body{width:960px;height:540px;overflow:hidden;font-family:\'Segoe UI\',sans-serif;background:' + t.background + ';color:' + t.color + ';display:flex;align-items:center;justify-content:center;text-align:center;padding:60px;}h1{font-size:42px;color:' + t.h1Color + ';}p{font-size:22px;margin-top:12px;}</style></head><body><div><h1>' + escapeHtml(topic) + '</h1><p>Content to be filled</p></div></body></html>';
+            state.slides.splice(position, 0, newSlide);
+            state.currentSlideIndex = position;
+            saveSlides();
+            renderAll();
+            addSystemMessage('Added slide at position ' + (position + 1) + ': ' + topic);
+            return true;
+        }
+        var delMatch = prompt.match(/delete\s+(?:slide\s+)?(\d+)/i);
+        if (delMatch) {
+            var idx = parseInt(delMatch[1]) - 1;
+            if (idx < 0 || idx >= state.slides.length) {
+                addErrorMessage('Invalid slide number: ' + delMatch[1] + '.');
+                return true;
+            }
+            deleteSlide(idx);
+            addSystemMessage('Deleted slide ' + delMatch[1]);
+            return true;
+        }
+        var moveMatch = prompt.match(/move\s+(?:slide\s+)?(\d+)\s+(?:to\s+)?(?:position\s+)?(\d+)/i);
+        if (moveMatch) {
+            var from = parseInt(moveMatch[1]) - 1;
+            var to = parseInt(moveMatch[2]) - 1;
+            if (from < 0 || from >= state.slides.length || to < 0 || to >= state.slides.length) {
+                addErrorMessage('Invalid slide position.');
+                return true;
+            }
+            moveSlide(from, to);
+            addSystemMessage('Moved slide ' + moveMatch[1] + ' to position ' + moveMatch[2]);
+            return true;
+        }
+        return false;
+    }
+
     function addSystemMessage(content) {
         const messagesDiv = document.getElementById('chat-messages');
         const msg = document.createElement('div');
@@ -1572,8 +1645,24 @@ body { background: #111; overflow: hidden; }
         };
 
         try {
+            var researchChecked = document.getElementById('research-checkbox').checked;
+            var researchContext = '';
+
+            if (researchChecked && state.currentProvider === 'ollama') {
+                streamMsg.textContent = 'Researching topic...';
+                updateGenerationOverlay(0);
+                var genText = document.getElementById('gen-overlay-text');
+                if (genText) genText.textContent = 'Researching...';
+                researchContext = await doResearch(prompt);
+                if (genText) genText.textContent = 'Generating presentation...';
+            }
+
             const mode = document.getElementById('gen-mode-select').value;
             let systemPrompt = getSlideSystemPrompt(mode) + getImageContext();
+
+            if (researchContext) {
+                systemPrompt += '\n\nRESEARCH DATA (use this factual information in your slides):\n' + researchContext;
+            }
 
             const maxSlides = document.getElementById('max-slides-input').value;
             if (maxSlides && parseInt(maxSlides) > 0) {
@@ -1605,7 +1694,7 @@ body { background: #111; overflow: hidden; }
                     state.currentSlideIndex = 0;
                     saveSlides();
                     renderAll();
-                    streamMsg.textContent = `Done. ${finalCount} slide(s) generated.`;
+                    streamMsg.textContent = 'Done. ' + finalCount + ' slide(s) generated.';
                     showGenerationComplete(finalCount);
                 } else {
                     streamMsg.textContent = 'Could not parse slides from the response. Try rephrasing or using a different generation mode.';
@@ -1613,14 +1702,14 @@ body { background: #111; overflow: hidden; }
                 }
             } else {
                 streamMsg.textContent = allParsedSlides.length > 0
-                    ? `Stopped after ${allParsedSlides.length} slide(s).`
+                    ? 'Stopped after ' + allParsedSlides.length + ' slide(s).'
                     : 'Generation cancelled.';
                 showGenerationComplete(allParsedSlides.length);
             }
         } catch (e) {
             state.onStreamToken = null;
             if (e.name !== 'AbortError') {
-                streamMsg.textContent = `Error: ${e.message}`;
+                streamMsg.textContent = 'Error: ' + e.message;
                 showGenerationError(e.message);
             }
         } finally {
@@ -1642,6 +1731,11 @@ body { background: #111; overflow: hidden; }
         if (!prompt) return;
         if (state.slides.length === 0) {
             addErrorMessage('No slides to edit. Generate slides first or switch to Generate mode.');
+            return;
+        }
+
+        if (handleToolCommand(prompt)) {
+            input.value = '';
             return;
         }
 
@@ -2244,6 +2338,14 @@ body { background: #111; overflow: hidden; }
         document.getElementById('export-pptx-btn').addEventListener('click', () => {
             if (typeof window.exportToPPTX === 'function') {
                 window.exportToPPTX(state.slides, document.getElementById('presentation-title').value);
+            } else {
+                addErrorMessage('Export module not loaded.');
+            }
+        });
+
+        document.getElementById('export-editable-pptx-btn').addEventListener('click', () => {
+            if (typeof window.exportToEditablePPTX === 'function') {
+                window.exportToEditablePPTX(state.slides, document.getElementById('presentation-title').value);
             } else {
                 addErrorMessage('Export module not loaded.');
             }

@@ -405,4 +405,161 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
         w.document.write(htmlContent);
         w.document.close();
     }
+
+    function hexToRgb(hex) {
+        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+    }
+
+    function parsePxToInches(px) {
+        if (!px) return null;
+        var num = parseFloat(px);
+        if (isNaN(num)) return null;
+        return num / 96;
+    }
+
+    function sanitizeColorForPptx(color) {
+        if (!color) return 'FFFFFF';
+        var match = color.match(/#[0-9a-fA-F]{6}/);
+        if (match) return match[0].replace('#', '');
+        match = color.match(/#[0-9a-fA-F]{3}/);
+        if (match) {
+            var h = match[0];
+            return h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
+        }
+        return 'FFFFFF';
+    }
+
+    function extractFontSize(element) {
+        var style = element.getAttribute('style') || '';
+        var match = style.match(/font-size\s*:\s*(\d+)px/i);
+        if (match) return parseFloat(match[1]);
+        return null;
+    }
+
+    function extractTextColor(element) {
+        var style = element.getAttribute('style') || '';
+        var match = style.match(/color\s*:\s*(#[0-9a-fA-F]{3,6})/i);
+        if (match) return sanitizeColorForPptx(match[1]);
+        return null;
+    }
+
+    window.exportToEditablePPTX = async function (slides, title) {
+        if (!slides || slides.length === 0) { alert('No slides to export.'); return; }
+
+        var overlay = document.createElement('div');
+        overlay.id = 'export-overlay';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"Segoe UI",sans-serif;';
+        overlay.innerHTML = '<div style="background:#1a1a2e;border:1px solid #4fc3f7;border-radius:16px;padding:30px 40px;text-align:center;max-width:400px;"><div style="width:32px;height:32px;border:3px solid #333;border-top-color:#4fc3f7;border-radius:50%;animation:gen-spin 0.8s linear infinite;margin:0 auto 16px;"></div><div style="color:#4fc3f7;font-size:16px;font-weight:600;">Building editable PPTX...</div><div id="editable-pptx-progress" style="color:#a0a0b0;font-size:13px;margin-top:8px;">Processing 0 / ' + slides.length + '</div></div>';
+        document.body.appendChild(overlay);
+        var progress = overlay.querySelector('#editable-pptx-progress');
+
+        if (typeof PptxGenJS === 'undefined') {
+            try {
+                await loadScript('https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js');
+            } catch (e) {
+                overlay.remove();
+                alert('Failed to load PptxGenJS.');
+                return;
+            }
+        }
+
+        try {
+            var pptx = new PptxGenJS();
+            pptx.layout = 'LAYOUT_WIDE';
+            pptx.title = title || 'Presentation';
+            pptx.author = 'Presentation Canvas';
+
+            for (var i = 0; i < slides.length; i++) {
+                if (progress) progress.textContent = 'Processing ' + (i + 1) + ' / ' + slides.length;
+
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(slides[i], 'text/html');
+                var body = doc.querySelector('body');
+                var styleEl = doc.querySelector('style');
+                var slide = pptx.addSlide();
+
+                var bgColor = '1A1A2E';
+                if (body) {
+                    var bodyStyle = body.getAttribute('style') || '';
+                    var bgMatch = bodyStyle.match(/background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})/i) ||
+                        (styleEl && styleEl.textContent.match(/body\s*\{[^}]*background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})/i));
+                    if (bgMatch) bgColor = sanitizeColorForPptx(bgMatch[1]);
+                }
+                slide.background = { color: bgColor };
+
+                var allTextElements = doc.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,div,span,td,th');
+                var textBoxes = [];
+
+                allTextElements.forEach(function (el) {
+                    var text = el.textContent.trim();
+                    if (!text || text.length < 1) return;
+
+                    if (el.closest('svg') || el.closest('canvas')) return;
+
+                    var elStyle = el.getAttribute('style') || '';
+                    var fontSize = null;
+                    var tagName = el.tagName.toUpperCase();
+
+                    var styleMatch = elStyle.match(/font-size\s*:\s*(\d+)px/i);
+                    if (styleMatch) fontSize = parseInt(styleMatch[1]);
+                    if (!fontSize) {
+                        if (tagName === 'H1') fontSize = 48;
+                        else if (tagName === 'H2') fontSize = 36;
+                        else if (tagName === 'H3') fontSize = 28;
+                        else if (tagName === 'H4') fontSize = 22;
+                        else if (tagName === 'H5' || tagName === 'H6') fontSize = 18;
+                        else fontSize = 18;
+                    }
+
+                    var isBold = tagName.match(/^H[1-4]$/) || (elStyle.indexOf('font-weight:bold') !== -1 || elStyle.indexOf('font-weight:700') !== -1);
+                    var textColor = 'FFFFFF';
+                    var colorMatch = elStyle.match(/color\s*:\s*(#[0-9a-fA-F]{3,6})/i);
+                    if (colorMatch) textColor = sanitizeColorForPptx(colorMatch[1]);
+
+                    var pptxFontSize = Math.min(72, Math.max(8, fontSize * 1.33));
+                    var pptxInches = pptxFontSize / 72;
+
+                    var pt = slide.addText(text, {
+                        x: 0.3,
+                        y: 0.5 + textBoxes.length * (pptxInches + 0.15),
+                        w: 12.7,
+                        h: pptxInches + 0.1,
+                        fontSize: pptxFontSize,
+                        color: textColor,
+                        bold: isBold,
+                        align: 'left',
+                        fontFace: 'Arial'
+                    });
+                    textBoxes.push(pt);
+                });
+
+                var images = doc.querySelectorAll('img');
+                images.forEach(function (img) {
+                    var src = img.getAttribute('src');
+                    if (src && (src.startsWith('data:image/') || src.startsWith('http'))) {
+                        try {
+                            slide.addImage({
+                                data: src,
+                                x: 1.5,
+                                y: 1.5 + textBoxes.length * 0.4,
+                                w: 10,
+                                h: 4,
+                                sizing: { type: 'contain', w: 10, h: 4 }
+                            });
+                        } catch (e) {
+                            console.warn('Could not embed image in slide ' + i, e);
+                        }
+                    }
+                });
+            }
+
+            await pptx.writeFile({ fileName: (title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_') + '_editable.pptx' });
+        } catch (e) {
+            console.error('Editable PPTX error:', e);
+            alert('Error creating editable PPTX: ' + e.message);
+        }
+
+        overlay.remove();
+    };
 })();
