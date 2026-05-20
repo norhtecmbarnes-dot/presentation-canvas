@@ -223,11 +223,9 @@ body { background: #333; }
 
     function renderSlideToPng(slideHtml) {
         return new Promise(function (resolve) {
-            var bgColor = extractBgColor(slideHtml);
-
-            var sizedHtml = gradientToSolid(slideHtml);
-            sizedHtml = sizedHtml.replace('</head>',
+            var sizedHtml = slideHtml.replace('</head>',
                 '<style>html,body{width:960px!important;height:540px!important;min-height:540px!important;overflow:hidden!important;margin:0!important;padding:0!important;}</style></head>');
+            var bgColor = extractBgColor(slideHtml);
 
             var iframe = document.createElement('iframe');
             // Position at viewport origin behind the export overlay (z-index:9999)
@@ -243,7 +241,7 @@ body { background: #333; }
                     }
                     html2canvas(iframeDoc.body, {
                         width: 960, height: 540, scale: 2,
-                        backgroundColor: bgColor,
+                        backgroundColor: null,
                         useCORS: true, allowTaint: true,
                         logging: false,
                         scrollX: 0, scrollY: 0,
