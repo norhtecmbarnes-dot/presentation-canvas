@@ -944,6 +944,7 @@ p{font-size:24px;color:#a0a0b0;}
     function getSlideSystemPrompt(mode) {
         const t = SLIDE_THEMES[state.currentTheme];
         const bg = t.background, c = t.color, ac = t.accent, h1c = t.h1Color;
+        const showSlideNumbers = document.getElementById('show-slide-numbers').checked;
 
         const ICONS = {
             check: '<svg viewBox="0 0 20 20" width="20" height="20"><path d="M4 10l4 4 8-8" stroke="%ac%" stroke-width="2" fill="none"/></svg>',
@@ -1037,7 +1038,7 @@ DESIGN RULES:
 - Always include the CSS variables (:root block) in every slide's <style> tag.
 - Always use flexbox centering with safe margins. Content must never touch slide edges.
 - Title slides: center vertically in full slide. Content slides: center within the content zone (between header and footer).
-- Add a small footer on content slides: position absolute, bottom:8px, right:16px, font-size:10px, opacity:0.6
+- Add a small footer on content slides: position absolute, bottom:8px, right:16px, font-size:10px, opacity:0.6. ${showSlideNumbers ? 'Show slide number in the footer.' : 'DO NOT include slide numbers in the footer.'}
 
 ═══════════════════════════
 BUILT-IN SVG ICONS (copy these into your slides):
@@ -1319,8 +1320,7 @@ Trigger: "risk matrix", "risk assessment"
 Risk levels: Low=#66bb6a  Medium=#ffca28  High=#ff9800  Extreme=#f44336/#b71c1c
 CONTENT RULES:
 - Max 6-7 lines per slide. Big fonts (16-24px for body, 28-48px for headings).
-- Logical flow: title slide -> agenda/overview -> content slides -> summary.
-- Small footer on every content slide: "Slide N | Title" at bottom-right.
+- Logical flow: title slide -> agenda/overview -> content slides -> summary.${showSlideNumbers ? '\n- Small footer on every content slide: "Slide N | Title" at bottom-right.' : '\n- Footer on content slides: DO NOT include any slide numbers. Use page-agnostic labels only.'}
 - Use meaningful content, never lorem ipsum.`;
 
         var result;
