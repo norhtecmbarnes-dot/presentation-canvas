@@ -176,21 +176,18 @@ body { background: #333; }
 
     function extractBgColor(slideHtml) {
         try {
-            var parser = new DOMParser();
-            var doc = parser.parseFromString(slideHtml, 'text/html');
-            var style = doc.querySelector('style');
-            if (style) {
-                var css = style.textContent.replace(/\n/g, ' ');
-                var match = css.match(/background(?:-color)?\s*:\s*([^;}]*(?:\([^)]*\)[^;}]*)*)/);
+            var styleMatch = slideHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/);
+            if (styleMatch) {
+                var css = styleMatch[1].replace(/\n/g, ' ');
+                var bg = gradientToSolid(css);
+                var match = bg.match(/background\s*:\s*(#[0-9a-fA-F]{3,6})/);
+                if (!match) match = css.match(/background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})/);
                 if (match) {
-                    var val = match[1].trim();
-                    var full = val.match(/#[0-9a-fA-F]{6}/);
-                    if (full) return full[0];
-                    var short = val.match(/#[0-9a-fA-F]{3}/);
-                    if (short) {
-                        var h = short[0];
-                        return '#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
+                    var val = match[1];
+                    if (val.length === 4) {
+                        return '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
                     }
+                    return val;
                 }
             }
         } catch (e) {}
@@ -238,63 +235,68 @@ body { background: #333; }
 
     function renderSlideToPng(slideHtml) {
         return new Promise(function (resolve) {
-            var processedHtml = processSlideHtml(slideHtml);
-            var bgColor = extractBgColor(processedHtml);
+            try {
+                var parser = new DOMParser();
+                var doc = parser.parseFromString(slideHtml, 'text/html');
+                var styleEl = doc.querySelector('style');
+                var css = styleEl ? styleEl.textContent : '';
+                var bodyEl = doc.querySelector('body');
+                var headEl = doc.querySelector('head');
 
-            var iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px;border:none;z-index:2;background:transparent;visibility:hidden;';
+                css = gradientToSolid(css);
+                css = css.replace(/(^|[\s{}>,+~])body(?=[\s{}:,.\[#])/gm, '$1.slide-png-root');
+                css = css.replace(/(^|[\s{}>,+~])html(?=[\s{}:,.\[#])/gm, '$1.slide-png-root');
+                css = css.replace(/min-height\s*:\s*100vh/gi, 'height:540px');
+                css = css.replace(/height\s*:\s*100vh/gi, 'height:540px');
+                css = css.replace(/min-height\s*:\s*100%/gi, 'height:540px');
+                css = css.replace(/var\(--slide-height\)/g, '540px');
+                css = css.replace(/var\(--slide-width\)/g, '960px');
 
-            iframe.onload = function () {
-                var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                iframe.style.visibility = 'visible';
-                setTimeout(function () {
-                    if (typeof html2canvas === 'undefined') {
-                        try { document.body.removeChild(iframe); } catch (ex) {}
-                        resolve(createSolidColorSlide(processedHtml, bgColor));
-                        return;
+                var wrapper = document.createElement('div');
+                wrapper.className = 'slide-png-root';
+                var bodyInline = (bodyEl && bodyEl.getAttribute('style')) || '';
+                wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;position:absolute;left:0;top:0;' + bodyInline;
+                wrapper.innerHTML = '<style>' + css + '</style>' + (bodyEl ? bodyEl.innerHTML : '');
+                document.body.appendChild(wrapper);
+
+                if (typeof html2canvas === 'undefined') {
+                    var bgColor = extractBgColor(slideHtml);
+                    document.body.removeChild(wrapper);
+                    resolve(createSolidColorSlide(slideHtml, bgColor));
+                    return;
+                }
+
+                html2canvas(wrapper, {
+                    width: 960, height: 540, scale: 2,
+                    backgroundColor: null,
+                    useCORS: true, allowTaint: true,
+                    logging: false,
+                    scrollX: 0, scrollY: 0,
+                    windowWidth: 960, windowHeight: 540,
+                    onclone: function (clonedDoc) {
+                        var root = clonedDoc.querySelector('.slide-png-root');
+                        if (root) root.style.position = 'relative';
                     }
-                    html2canvas(iframeDoc.body, {
-                        width: 960, height: 540, scale: 2,
-                        backgroundColor: bgColor,
-                        useCORS: true, allowTaint: true,
-                        logging: false,
-                        scrollX: 0, scrollY: 0,
-                        windowWidth: 960, windowHeight: 540
-                    }).then(function (canvas) {
-                        document.body.removeChild(iframe);
-                        resolve(canvas.toDataURL('image/png'));
-                    }).catch(function (err) {
-                        console.warn('html2canvas iframe render failed:', err);
-                        try { document.body.removeChild(iframe); } catch (ex) {}
-                        resolve(createSolidColorSlide(processedHtml, bgColor));
-                    });
-                }, 300);
-            };
-
-            iframe.onerror = function () {
-                try { document.body.removeChild(iframe); } catch (ex) {}
-                createSolidColorSlide(processedHtml, bgColor).then(resolve);
-            };
-
-            document.body.appendChild(iframe);
-            var doc = iframe.contentDocument || iframe.contentWindow.document;
-            doc.open();
-            doc.write(processedHtml);
-            doc.close();
+                }).then(function (canvas) {
+                    var bgColor = extractBgColor(slideHtml);
+                    var finalCanvas = document.createElement('canvas');
+                    finalCanvas.width = canvas.width;
+                    finalCanvas.height = canvas.height;
+                    var ctx = finalCanvas.getContext('2d');
+                    ctx.fillStyle = bgColor;
+                    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+                    ctx.drawImage(canvas, 0, 0);
+                    document.body.removeChild(wrapper);
+                    resolve(finalCanvas.toDataURL('image/png'));
+                }).catch(function (err) {
+                    console.warn('html2canvas render failed:', err);
+                    try { document.body.removeChild(wrapper); } catch (ex) {}
+                    resolve(createSolidColorSlide(slideHtml, extractBgColor(slideHtml)));
+                });
+            } catch (e) {
+                resolve(createSolidColorSlide(slideHtml, extractBgColor(slideHtml)));
+            }
         });
-    }
-
-    function processSlideHtml(slideHtml) {
-        var result = slideHtml;
-        result = result.replace(/<style([^>]*)>([\s\S]*?)<\/style>/g, function (full, attrs, css) {
-            return '<style' + attrs + '>' + gradientToSolid(css) + '</style>';
-        });
-        result = result.replace(/style\s*=\s*"([^"]*)"/g, function (full, inline) {
-            var fixed = gradientToSolid(inline);
-            if (fixed !== inline) return 'style="' + fixed + '"';
-            return full;
-        });
-        return result;
     }
 
     function createSolidColorSlide(slideHtml, bgColor) {
