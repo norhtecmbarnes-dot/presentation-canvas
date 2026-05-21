@@ -236,12 +236,12 @@ body { background: #333; }
     function renderSlideToPng(slideHtml) {
         return new Promise(function (resolve) {
             try {
+                var bgColor = extractBgColor(slideHtml);
                 var parser = new DOMParser();
                 var doc = parser.parseFromString(slideHtml, 'text/html');
                 var styleEl = doc.querySelector('style');
                 var css = styleEl ? styleEl.textContent : '';
                 var bodyEl = doc.querySelector('body');
-                var headEl = doc.querySelector('head');
 
                 css = gradientToSolid(css);
                 css = css.replace(/(^|[\s{}>,+~])body(?=[\s{}:,.\[#])/gm, '$1.slide-png-root');
@@ -255,43 +255,39 @@ body { background: #333; }
                 var wrapper = document.createElement('div');
                 wrapper.className = 'slide-png-root';
                 var bodyInline = (bodyEl && bodyEl.getAttribute('style')) || '';
-                wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;position:absolute;left:0;top:0;' + bodyInline;
+                wrapper.style.cssText = 'width:960px;height:540px;overflow:hidden;position:absolute;left:-9999px;top:0;' + bodyInline;
                 wrapper.innerHTML = '<style>' + css + '</style>' + (bodyEl ? bodyEl.innerHTML : '');
                 document.body.appendChild(wrapper);
 
                 if (typeof html2canvas === 'undefined') {
-                    var bgColor = extractBgColor(slideHtml);
                     document.body.removeChild(wrapper);
                     resolve(createSolidColorSlide(slideHtml, bgColor));
                     return;
                 }
 
-                html2canvas(wrapper, {
-                    width: 960, height: 540, scale: 2,
-                    backgroundColor: null,
-                    useCORS: true, allowTaint: true,
-                    logging: false,
-                    scrollX: 0, scrollY: 0,
-                    windowWidth: 960, windowHeight: 540,
-                    onclone: function (clonedDoc) {
-                        var root = clonedDoc.querySelector('.slide-png-root');
-                        if (root) root.style.position = 'relative';
-                    }
-                }).then(function (canvas) {
-                    var bgColor = extractBgColor(slideHtml);
-                    var finalCanvas = document.createElement('canvas');
-                    finalCanvas.width = canvas.width;
-                    finalCanvas.height = canvas.height;
-                    var ctx = finalCanvas.getContext('2d');
-                    ctx.fillStyle = bgColor;
-                    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-                    ctx.drawImage(canvas, 0, 0);
-                    document.body.removeChild(wrapper);
-                    resolve(finalCanvas.toDataURL('image/png'));
-                }).catch(function (err) {
-                    console.warn('html2canvas render failed:', err);
-                    try { document.body.removeChild(wrapper); } catch (ex) {}
-                    resolve(createSolidColorSlide(slideHtml, extractBgColor(slideHtml)));
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        html2canvas(wrapper, {
+                            width: 960,
+                            height: 540,
+                            scale: 2,
+                            backgroundColor: bgColor,
+                            useCORS: true,
+                            allowTaint: true,
+                            logging: false,
+                            scrollX: 0,
+                            scrollY: 0,
+                            windowWidth: 960,
+                            windowHeight: 540
+                        }).then(function (canvas) {
+                            document.body.removeChild(wrapper);
+                            resolve(canvas.toDataURL('image/png'));
+                        }).catch(function (err) {
+                            console.warn('html2canvas render failed:', err);
+                            try { document.body.removeChild(wrapper); } catch (ex) {}
+                            resolve(createSolidColorSlide(slideHtml, bgColor));
+                        });
+                    });
                 });
             } catch (e) {
                 resolve(createSolidColorSlide(slideHtml, extractBgColor(slideHtml)));
