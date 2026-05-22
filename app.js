@@ -2146,6 +2146,14 @@ body { background: #111; overflow: hidden; }
         if (state.currentView === 'edit' && view !== 'edit') {
             saveWysiwygEdits();
         }
+        if (state.currentView === 'html' && view !== 'html') {
+            clearTimeout(debounceTimer);
+            var editorVal = document.getElementById('slide-html-editor').value;
+            if (state.slides.length > 0) {
+                state.slides[state.currentSlideIndex] = editorVal;
+                saveSlides();
+            }
+        }
         state.currentView = view;
         const previewArea = document.getElementById('slide-preview-area');
         const htmlArea = document.getElementById('slide-html-area');
