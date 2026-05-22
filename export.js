@@ -527,128 +527,144 @@ h1 { text-align: center; color: #fff; font-family: sans-serif; padding: 20px; }
                 var slideBottom = 7.1;
                 var imageCount = 0;
 
+                function processChildElements(parent) {
+                    var children = Array.from(parent.children);
+                    if (children.length === 0 && parent.textContent.trim()) {
+                        var tag = parent.tagName.toUpperCase();
+                        var text = parent.textContent.trim();
+                        if (tag.match(/^H[1-6]$/)) {
+                            addPptxHeading(text, tag, parent);
+                        } else if (tag === 'P' || tag === 'DIV' || tag === 'SPAN') {
+                            addPptxParagraph(text, parent);
+                        }
+                        return;
+                    }
+                    children.forEach(function (child) {
+                        var tag = child.tagName.toUpperCase();
+                        if (tag.match(/^H[1-6]$/)) {
+                            var text = child.textContent.trim();
+                            if (text) addPptxHeading(text, tag, child);
+                        } else if (tag === 'P') {
+                            var text = child.textContent.trim();
+                            if (text) addPptxParagraph(text, child);
+                        } else if (tag === 'UL' || tag === 'OL') {
+                            addPptxList(child);
+                        } else if (tag === 'TABLE') {
+                            addPptxTable(child);
+                        } else if (tag === 'IMG') {
+                            addPptxImage(child);
+                        } else if (tag === 'DIV' || tag === 'SECTION' || tag === 'NAV' || tag === 'HEADER' || tag === 'MAIN' || tag === 'ARTICLE') {
+                            processChildElements(child);
+                        }
+                    });
+                }
+
+                function addPptxHeading(text, tag, el) {
+                    var fontSize = parseInt(resolveStyle(el, cssRules, 'font-size')) || DEFAULT_TAG_SIZES[tag] || 36;
+                    var pptxFs = pptxFontFromHtml(fontSize);
+                    var color = resolveStyle(el, cssRules, 'color');
+                    var pptxColor = color ? sanitizeColorForPptx(color) : 'FFFFFF';
+                    var isBold = tag === 'H1' || tag === 'H2' || tag === 'H3' ||
+                        (resolveStyle(el, cssRules, 'font-weight') || '').match(/bold|700|800|900/);
+                    var marginBottom = tag === 'H1' ? 0.15 : tag === 'H2' ? 0.1 : 0.06;
+                    slide.addText(text, {
+                        x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
+                        h: (pptxFs / 72) + marginBottom,
+                        fontSize: pptxFs, color: pptxColor, bold: !!isBold,
+                        align: 'left', fontFace: 'Calibri'
+                    });
+                    currentY += (pptxFs / 72) + marginBottom + 0.06;
+                }
+
+                function addPptxParagraph(text, el) {
+                    var fontSize = parseInt(resolveStyle(el, cssRules, 'font-size')) || 18;
+                    var pptxFs = pptxFontFromHtml(fontSize);
+                    var color = resolveStyle(el, cssRules, 'color');
+                    var pptxColor = color ? sanitizeColorForPptx(color) : 'FFFFFF';
+                    var isBold = (resolveStyle(el, cssRules, 'font-weight') || '').match(/bold|700|800|900/);
+                    var lineH = (pptxFs / 72) + 0.04;
+                    var estLines = Math.max(1, Math.ceil(text.length / 90));
+                    var textH = estLines * lineH;
+                    slide.addText(text, {
+                        x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
+                        h: textH, fontSize: pptxFs, color: pptxColor, bold: !!isBold,
+                        align: 'left', fontFace: 'Calibri'
+                    });
+                    currentY += textH + 0.08;
+                }
+
+                function addPptxList(list) {
+                    var items = list.querySelectorAll('li');
+                    if (items.length === 0) return;
+                    var textLines = [];
+                    items.forEach(function (li) {
+                        var t = li.textContent.trim();
+                        if (t) textLines.push({ text: '\u2022 ' + t, options: { bullet: true } });
+                    });
+                    if (textLines.length === 0) return;
+                    var liFontSize = parseInt(resolveStyle(items[0], cssRules, 'font-size')) || 16;
+                    var liPptxFs = pptxFontFromHtml(liFontSize);
+                    var liColor = resolveStyle(items[0], cssRules, 'color');
+                    var liPptxColor = liColor ? sanitizeColorForPptx(liColor) : 'FFFFFF';
+                    var lineH = (liPptxFs / 72) + 0.06;
+                    var listH = textLines.length * lineH;
+                    slide.addText(textLines, {
+                        x: LEFT_MARGIN + 0.25, y: currentY, w: FULL_WIDTH - 0.25,
+                        h: listH, fontSize: liPptxFs, color: liPptxColor,
+                        align: 'left', fontFace: 'Calibri', bullet: true
+                    });
+                    currentY += listH + 0.1;
+                }
+
+                function addPptxTable(table) {
+                    var rows = table.querySelectorAll('tr');
+                    if (rows.length === 0) return;
+                    var pptxRows = [];
+                    var colCount = 0;
+                    rows.forEach(function (row) {
+                        var cells = row.querySelectorAll('td,th');
+                        colCount = Math.max(colCount, cells.length);
+                        var pptxRow = [];
+                        cells.forEach(function (cell) {
+                            pptxRow.push({ text: cell.textContent.trim(), options: { bold: cell.tagName === 'TH', fontSize: 12, align: 'center', color: '333333', fill: { color: cell.tagName === 'TH' ? 'E0E0E0' : 'FFFFFF' } } });
+                        });
+                        pptxRows.push(pptxRow);
+                    });
+                    var tableH = Math.min(3, rows.length * 0.4);
+                    var colW = FULL_WIDTH / Math.max(1, colCount);
+                    try {
+                        slide.addTable(pptxRows, {
+                            x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
+                            border: { pt: 0.5, color: 'CCCCCC' },
+                            colW: colW, rowH: 0.35,
+                            fontSize: 12, fontFace: 'Calibri'
+                        });
+                        currentY += tableH + 0.15;
+                    } catch (e) {
+                        console.warn('Table add failed for slide ' + i, e);
+                    }
+                }
+
+                function addPptxImage(img) {
+                    var src = img.getAttribute('src');
+                    if (!src || (!src.startsWith('data:image/') && !src.startsWith('http'))) return;
+                    try {
+                        slide.addImage({
+                            data: src,
+                            x: 1.5 + (imageCount % 2) * 5,
+                            y: currentY + Math.floor(imageCount / 2) * 3,
+                            w: 4.5, h: 2.8,
+                            sizing: { type: 'contain', w: 4.5, h: 2.8 }
+                        });
+                        imageCount++;
+                    } catch (e) {
+                        console.warn('Image skipped in slide ' + i, e);
+                    }
+                }
+
                 bodyChildren.forEach(function (container) {
                     if (container.tagName === 'IMG') return;
-
-                    var headings = container.querySelectorAll('h1,h2,h3,h4,h5,h6');
-                    var paragraphs = container.querySelectorAll('p');
-                    var lists = container.querySelectorAll('ul,ol');
-                    var tables = container.querySelectorAll('table');
-                    var images = container.querySelectorAll('img');
-
-                    headings.forEach(function (h) {
-                        var text = h.textContent.trim();
-                        if (!text) return;
-                        var tag = h.tagName.toUpperCase();
-                        var fontSize = parseInt(resolveStyle(h, cssRules, 'font-size')) || DEFAULT_TAG_SIZES[tag] || 36;
-                        var pptxFs = pptxFontFromHtml(fontSize);
-                        var color = resolveStyle(h, cssRules, 'color');
-                        var pptxColor = color ? sanitizeColorForPptx(color) : 'FFFFFF';
-                        var isBold = tag === 'H1' || tag === 'H2' || tag === 'H3' ||
-                            (resolveStyle(h, cssRules, 'font-weight') || '').match(/bold|700|800|900/);
-                        var marginBottom = tag === 'H1' ? 0.15 : tag === 'H2' ? 0.1 : 0.06;
-
-                        slide.addText(text, {
-                            x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
-                            h: (pptxFs / 72) + marginBottom,
-                            fontSize: pptxFs, color: pptxColor, bold: !!isBold,
-                            align: 'left', fontFace: 'Calibri'
-                        });
-                        currentY += (pptxFs / 72) + marginBottom + 0.06;
-                    });
-
-                    paragraphs.forEach(function (p) {
-                        var text = p.textContent.trim();
-                        if (!text) return;
-                        var fontSize = parseInt(resolveStyle(p, cssRules, 'font-size')) || 18;
-                        var pptxFs = pptxFontFromHtml(fontSize);
-                        var color = resolveStyle(p, cssRules, 'color');
-                        var pptxColor = color ? sanitizeColorForPptx(color) : 'FFFFFF';
-                        var isBold = (resolveStyle(p, cssRules, 'font-weight') || '').match(/bold|700|800|900/);
-                        var lineH = (pptxFs / 72) + 0.04;
-                        var estLines = Math.max(1, Math.ceil(text.length / 90));
-                        var textH = estLines * lineH;
-
-                        slide.addText(text, {
-                            x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
-                            h: textH, fontSize: pptxFs, color: pptxColor, bold: !!isBold,
-                            align: 'left', fontFace: 'Calibri'
-                        });
-                        currentY += textH + 0.08;
-                    });
-
-                    lists.forEach(function (list) {
-                        var items = list.querySelectorAll('li');
-                        if (items.length === 0) return;
-                        var textLines = [];
-                        items.forEach(function (li) {
-                            var t = li.textContent.trim();
-                            if (t) textLines.push({ text: '\u2022 ' + t, options: { bullet: true } });
-                        });
-                        if (textLines.length === 0) return;
-                        var liFontSize = parseInt(resolveStyle(items[0], cssRules, 'font-size')) || 16;
-                        var liPptxFs = pptxFontFromHtml(liFontSize);
-                        var liColor = resolveStyle(items[0], cssRules, 'color');
-                        var liPptxColor = liColor ? sanitizeColorForPptx(liColor) : 'FFFFFF';
-                        var lineH = (liPptxFs / 72) + 0.06;
-                        var listH = textLines.length * lineH;
-
-                        slide.addText(textLines, {
-                            x: LEFT_MARGIN + 0.25, y: currentY, w: FULL_WIDTH - 0.25,
-                            h: listH, fontSize: liPptxFs, color: liPptxColor,
-                            align: 'left', fontFace: 'Calibri', bullet: true
-                        });
-                        currentY += listH + 0.1;
-                    });
-
-                    tables.forEach(function (table) {
-                        var rows = table.querySelectorAll('tr');
-                        if (rows.length === 0) return;
-                        var pptxRows = [];
-                        var colCount = 0;
-                        rows.forEach(function (row) {
-                            var cells = row.querySelectorAll('td,th');
-                            colCount = Math.max(colCount, cells.length);
-                            var pptxRow = [];
-                            cells.forEach(function (cell) {
-                                pptxRow.push({ text: cell.textContent.trim(), options: { bold: cell.tagName === 'TH', fontSize: 12, align: 'center', color: '333333', fill: { color: cell.tagName === 'TH' ? 'E0E0E0' : 'FFFFFF' } } });
-                            });
-                            pptxRows.push(pptxRow);
-                        });
-                        var tableH = Math.min(3, rows.length * 0.4);
-                        var colW = FULL_WIDTH / Math.max(1, colCount);
-                        try {
-                            slide.addTable(pptxRows, {
-                                x: LEFT_MARGIN, y: currentY, w: FULL_WIDTH,
-                                border: { pt: 0.5, color: 'CCCCCC' },
-                                colW: colW, rowH: 0.35,
-                                fontSize: 12, fontFace: 'Calibri'
-                            });
-                            currentY += tableH + 0.15;
-                        } catch (e) {
-                            console.warn('Table add failed for slide ' + i, e);
-                        }
-                    });
-
-                    images.forEach(function (img) {
-                        var src = img.getAttribute('src');
-                        if (!src || (!src.startsWith('data:image/') && !src.startsWith('http'))) return;
-                        try {
-                            slide.addImage({
-                                data: src,
-                                x: 1.5 + (imageCount % 2) * 5,
-                                y: currentY + Math.floor(imageCount / 2) * 3,
-                                w: 4.5, h: 2.8,
-                                sizing: { type: 'contain', w: 4.5, h: 2.8 }
-                            });
-                            imageCount++;
-                        } catch (e) {
-                            console.warn('Image skipped in slide ' + i, e);
-                        }
-                    });
-                    if (images.length > 0) {
-                        currentY += Math.ceil(images.length / 2) * 3 + 0.2;
-                    }
+                    processChildElements(container);
                 });
 
                 if (body) {
