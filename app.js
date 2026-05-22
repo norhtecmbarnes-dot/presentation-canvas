@@ -141,8 +141,55 @@ p{font-size:24px;color:#a0a0b0;}
         brandProfiles: {},
         currentBrandProfile: 'default',
         _editableWrapper: null,
-        _brandCollapsed: false
+        _brandCollapsed: false,
+        undoStack: [],
+        redoStack: [],
+        _undoInProgress: false
     };
+
+    function pushUndo() {
+        if (state._undoInProgress) return;
+        state.undoStack.push({
+            slides: state.slides.slice(),
+            currentSlideIndex: state.currentSlideIndex
+        });
+        if (state.undoStack.length > 50) state.undoStack.shift();
+        state.redoStack = [];
+    }
+
+    function undo() {
+        if (state.undoStack.length === 0) return;
+        state._undoInProgress = true;
+        var current = {
+            slides: state.slides.slice(),
+            currentSlideIndex: state.currentSlideIndex
+        };
+        state.redoStack.push(current);
+        if (state.redoStack.length > 50) state.redoStack.shift();
+        var snapshot = state.undoStack.pop();
+        state.slides = snapshot.slides;
+        state.currentSlideIndex = Math.min(snapshot.currentSlideIndex, state.slides.length - 1);
+        saveCurrentSession();
+        renderAll();
+        addSystemMessage('Undo');
+        state._undoInProgress = false;
+    }
+
+    function redo() {
+        if (state.redoStack.length === 0) return;
+        state._undoInProgress = true;
+        state.undoStack.push({
+            slides: state.slides.slice(),
+            currentSlideIndex: state.currentSlideIndex
+        });
+        var snapshot = state.redoStack.pop();
+        state.slides = snapshot.slides;
+        state.currentSlideIndex = Math.min(snapshot.currentSlideIndex, state.slides.length - 1);
+        saveCurrentSession();
+        renderAll();
+        addSystemMessage('Redo');
+        state._undoInProgress = false;
+    }
 
     function loadSettings() {
         try {
@@ -426,6 +473,7 @@ p{font-size:24px;color:#a0a0b0;}
     }
 
     function addSlide(html) {
+        pushUndo();
         state.slides.push(html || DEFAULT_SLIDE_HTML);
         state.currentSlideIndex = state.slides.length - 1;
         saveSlides();
@@ -434,6 +482,7 @@ p{font-size:24px;color:#a0a0b0;}
 
     function deleteSlide(index) {
         if (state.slides.length <= 1) return;
+        pushUndo();
         state.slides.splice(index, 1);
         if (state.currentSlideIndex >= state.slides.length) {
             state.currentSlideIndex = state.slides.length - 1;
@@ -444,6 +493,7 @@ p{font-size:24px;color:#a0a0b0;}
 
     function moveSlide(from, to) {
         if (to < 0 || to >= state.slides.length) return;
+        pushUndo();
         const [slide] = state.slides.splice(from, 1);
         state.slides.splice(to, 0, slide);
         state.currentSlideIndex = to;
@@ -455,6 +505,7 @@ p{font-size:24px;color:#a0a0b0;}
         if (state.slides.length === 0) {
             state.slides.push(html);
         } else {
+            pushUndo();
             state.slides[state.currentSlideIndex] = html;
         }
         saveSlides();
@@ -486,17 +537,49 @@ p{font-size:24px;color:#a0a0b0;}
     function renderThumbnails() {
         const container = document.getElementById('slide-thumbnails');
         container.innerHTML = '';
+        var dragSrcIndex = null;
+
         state.slides.forEach((slide, i) => {
             const thumb = document.createElement('div');
             thumb.className = 'slide-thumb' + (i === state.currentSlideIndex ? ' active' : '');
+            thumb.draggable = true;
+            thumb.dataset.index = i;
             thumb.innerHTML = `<span class="slide-thumb-number">${i + 1}</span>`;
             const iframe = document.createElement('iframe');
             iframe.sandbox = 'allow-scripts allow-same-origin';
             iframe.srcdoc = slide;
+            iframe.style.pointerEvents = 'none';
             thumb.appendChild(iframe);
             thumb.addEventListener('click', () => {
                 state.currentSlideIndex = i;
                 renderAll();
+            });
+            thumb.addEventListener('dragstart', function(e) {
+                dragSrcIndex = i;
+                this.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            thumb.addEventListener('dragend', function() {
+                this.style.opacity = '';
+                dragSrcIndex = null;
+            });
+            thumb.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            thumb.addEventListener('drop', function(e) {
+                e.stopPropagation();
+                if (dragSrcIndex === null || dragSrcIndex === i) return;
+                pushUndo();
+                var targetIdx = i;
+                var fromIdx = dragSrcIndex;
+                if (fromIdx < targetIdx) targetIdx--;
+                var slide = state.slides.splice(fromIdx, 1)[0];
+                state.slides.splice(targetIdx, 0, slide);
+                state.currentSlideIndex = targetIdx;
+                saveSlides();
+                renderAll();
+                dragSrcIndex = null;
             });
             container.appendChild(thumb);
         });
@@ -592,6 +675,7 @@ p{font-size:24px;color:#a0a0b0;}
     }
 
     function applyFooterLabel() {
+        pushUndo();
         var label = document.getElementById('footer-label-input').value.trim();
         var t = SLIDE_THEMES[state.currentTheme];
         state.slides = state.slides.map(function(html, i) {
@@ -617,6 +701,7 @@ p{font-size:24px;color:#a0a0b0;}
 
     function applyLogoToAllSlides() {
         if (!state.logo || state.slides.length === 0) return;
+        pushUndo();
 
         const position = document.getElementById('logo-position').value;
         const size = parseInt(document.getElementById('logo-size').value);
@@ -649,6 +734,7 @@ p{font-size:24px;color:#a0a0b0;}
     }
 
     function removeLogoFromAllSlides() {
+        pushUndo();
         state.logo = null;
         saveLogo();
 
@@ -663,7 +749,11 @@ p{font-size:24px;color:#a0a0b0;}
     }
 
     function renderAll() {
-        renderSlidePreview();
+        if (state.currentView === 'edit') {
+            renderWysiwygView();
+        } else {
+            renderSlidePreview();
+        }
         renderThumbnails();
         renderUploadedImages();
         updateSlideProps();
@@ -714,24 +804,61 @@ p{font-size:24px;color:#a0a0b0;}
         addSystemMessage('Researching: ' + topic);
         try {
             var researchPrompt = 'Research the following topic thoroughly and provide a detailed summary with key facts, statistics, dates, names, and data that would be useful for a presentation. Be factual and specific.\n\nTopic: ' + topic;
-            var response = await fetch(state.settings.ollamaUrl + '/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: model, prompt: researchPrompt, stream: false }),
-                signal: AbortSignal.timeout(60000)
-            });
-            if (!response.ok) throw new Error('Research request failed');
-            var data = await response.json();
-            var result = data.response || '';
-            if (result) {
-                addSystemMessage('Research complete (' + result.length + ' chars gathered)');
+            var provider = state.currentProvider;
+
+            if (provider === 'ollama') {
+                var response = await fetch(state.settings.ollamaUrl + '/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: model, prompt: researchPrompt, stream: false }),
+                    signal: AbortSignal.timeout(60000)
+                });
+                if (!response.ok) throw new Error('Research request failed');
+                var data = await response.json();
+                var result = data.response || '';
+                if (result) {
+                    addSystemMessage('Research complete (' + result.length + ' chars gathered)');
+                }
+                return result;
+            } else {
+                var messages = [{ role: 'user', content: researchPrompt }];
+                var result = await sendProviderResearch(provider, model, messages);
+                if (result) {
+                    addSystemMessage('Research complete (' + result.length + ' chars gathered)');
+                }
+                return result;
             }
-            return result;
         } catch (e) {
             console.warn('Research failed:', e);
             addSystemMessage('Research skipped (could not fetch data). Continuing without research.');
             return '';
         }
+    }
+
+    async function sendProviderResearch(provider, model, messages) {
+        var url, headers, body;
+        if (provider === 'openai') {
+            url = state.settings.openaiUrl + '/chat/completions';
+            headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + state.settings.openaiKey };
+        } else if (provider === 'zhipu') {
+            url = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+            headers = { 'Content-Type': 'application/json', 'Authorization': state.settings.zhipuKey };
+        } else if (provider === 'custom') {
+            url = state.settings.customUrl + '/chat/completions';
+            headers = { 'Content-Type': 'application/json' };
+            if (state.settings.customKey) headers['Authorization'] = 'Bearer ' + state.settings.customKey;
+        } else {
+            return '';
+        }
+        var response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ model: model, messages: messages, stream: false }),
+            signal: AbortSignal.timeout(60000)
+        });
+        if (!response.ok) throw new Error('Research request failed: ' + response.status);
+        var data = await response.json();
+        return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
     }
 
     function handleToolCommand(prompt) {
@@ -906,6 +1033,8 @@ p{font-size:24px;color:#a0a0b0;}
         }
     }
 
+    var _ollamaLastStatus = { ok: true, checked: false };
+
     async function refreshModels() {
         const modelSelect = document.getElementById('model-select');
         modelSelect.innerHTML = '<option value="">Loading...</option>';
@@ -915,12 +1044,35 @@ p{font-size:24px;color:#a0a0b0;}
 
         if (provider === 'ollama') {
             models = await fetchOllamaModels();
+            _ollamaLastStatus.ok = models.length > 0;
+            _ollamaLastStatus.checked = true;
+            if (!_ollamaLastStatus.ok) {
+                modelSelect.innerHTML =
+                    '<option value="">Ollama not running</option>' +
+                    '<option value="__START_OLLAMA__">Click here for help starting Ollama</option>';
+                addSystemMessage('Ollama is not running. Click the model dropdown for help starting it, or switch to a cloud provider (OpenAI, Zhipu, or Custom) in Settings.');
+                modelSelect.addEventListener('change', function handler(e) {
+                    if (e.target.value === '__START_OLLAMA__') {
+                        modelSelect.innerHTML = '<option value="">Ollama not running</option>' +
+                            '<option value="__START_OLLAMA__">Click here for help starting Ollama</option>';
+                        addSystemMessage('To start Ollama: 1) Open a terminal  2) Run: ollama serve  3) Click Refresh. To pull a model: ollama pull <model-name> (e.g. ollama pull llama3.2).');
+                    }
+                    modelSelect.removeEventListener('change', handler);
+                });
+                return;
+            }
         } else if (provider === 'openai') {
             models = await fetchOpenAIModels();
+            if (models.length === 0) {
+                addSystemMessage('Could not fetch OpenAI models. Check your API key in Settings, or switch to Ollama for local models.');
+            }
         } else if (provider === 'zhipu') {
             models = ['glm-4', 'glm-4-flash', 'glm-4-plus', 'glm-4v', state.settings.zhipuModel].filter((v, i, a) => a.indexOf(v) === i);
         } else if (provider === 'custom') {
             models = [state.settings.customModel].filter(Boolean);
+            if (models.length === 0) {
+                addSystemMessage('No model configured for Custom API. Enter a model name and endpoint in Settings.');
+            }
         }
 
         modelSelect.innerHTML = '';
@@ -937,7 +1089,26 @@ p{font-size:24px;color:#a0a0b0;}
         });
 
         state.currentModel = modelSelect.value;
+        restoreModelAndProvider();
         checkSmallModelWarning();
+    }
+
+    function restoreModelAndProvider() {
+        var savedProvider = localStorage.getItem('canvas_provider');
+        var savedModel = localStorage.getItem('canvas_model');
+        if (savedProvider) {
+            state.currentProvider = savedProvider;
+            var providerSelect = document.getElementById('provider-select');
+            if (providerSelect) providerSelect.value = savedProvider;
+        }
+        if (savedModel) {
+            var modelSelect = document.getElementById('model-select');
+            var options = Array.from(modelSelect.options).map(function (o) { return o.value; });
+            if (options.indexOf(savedModel) !== -1) {
+                modelSelect.value = savedModel;
+                state.currentModel = savedModel;
+            }
+        }
     }
 
     async function sendToLLM(prompt, systemPrompt) {
@@ -1085,7 +1256,8 @@ p{font-size:24px;color:#a0a0b0;}
     function isSmallModel() {
         var m = (state.currentModel || '').toLowerCase();
         if (/3b|4b|tiny|small|mini|nano|1b|2b|3\\.2b|3\\.1b|3-4b/.test(m)) return true;
-        if (/gemma2|gemma-2|qwen2\\.5:3|phi|smollm|stablelm/.test(m)) return true;
+        if (/gemma|phi|smollm|stablelm/.test(m)) return true;
+        if (/qwen2\\.5:[0-3]/.test(m)) return true;
         return false;
     }
 
@@ -1478,12 +1650,21 @@ CONTENT RULES:
 - Use meaningful content, never lorem ipsum.`;
 
         var result;
+        var finalLayoutCheck = '\n\n═══════════════════════════\nFINAL CHECK — READ THIS BEFORE GENERATING SLIDES\n═══════════════════════════\n' +
+            'EVERY slide body MUST have: width:960px; height:540px; overflow:hidden;\n' +
+            'EVERY content container MUST have: max-width:880px;\n' +
+            'DO NOT write more than 7 lines of text per slide.\n' +
+            'DO NOT let any text touch the edges — use padding:40px minimum.\n' +
+            'Font sizes: headings 28-48px, body text 14-20px.\n' +
+            'If a slide has too much content, SPLIT it across multiple slides.\n' +
+            'TEST: can all text fit inside a 960x540 box with 40px padding? If not, reduce content.';
+
         if (mode === 'script') {
-            result = basePrompt + '\n\nMODE: SCRIPT\nFirst output a numbered outline (1. Title, 2. Title...), then output all <<<SLIDE>>> blocks.';
+            result = basePrompt + finalLayoutCheck + '\n\nMODE: SCRIPT\nFirst output a numbered outline (1. Title, 2. Title...), then output all <<<SLIDE>>> blocks.';
         } else if (mode === 'markdown') {
-            result = basePrompt + '\n\nMODE: MARKDOWN\nFirst output the deck with ---SLIDE--- separators in markdown, then output all <<<SLIDE>>> blocks.';
+            result = basePrompt + finalLayoutCheck + '\n\nMODE: MARKDOWN\nFirst output the deck with ---SLIDE--- separators in markdown, then output all <<<SLIDE>>> blocks.';
         } else {
-            result = basePrompt + '\n\nMODE: SLIDES\nGenerate slide HTML blocks directly. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks.';
+            result = basePrompt + finalLayoutCheck + '\n\nMODE: SLIDES\nGenerate slide HTML blocks directly. Output ONLY <<<SLIDE>>>...<<<END_SLIDE>>> blocks.';
         }
 
         if (isSmallModel()) {
@@ -1729,7 +1910,7 @@ body { background: #111; overflow: hidden; }
             var researchChecked = document.getElementById('research-checkbox').checked;
             var researchContext = '';
 
-            if (researchChecked && state.currentProvider === 'ollama') {
+            if (researchChecked) {
                 streamMsg.textContent = 'Researching topic...';
                 updateGenerationOverlay(0);
                 var genText = document.getElementById('gen-overlay-text');
@@ -2048,7 +2229,11 @@ body { background: #111; overflow: hidden; }
             var styleEl = wrapper.querySelector('style');
             if (styleEl) styleEl.remove();
             bodyEl.innerHTML = wrapper.innerHTML;
-            state.slides[state.currentSlideIndex] = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+            var newHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+            if (state.slides[state.currentSlideIndex] !== newHtml) {
+                pushUndo();
+                state.slides[state.currentSlideIndex] = newHtml;
+            }
             saveCurrentSession();
             renderThumbnails();
         }
@@ -2337,11 +2522,15 @@ body { background: #111; overflow: hidden; }
 
         document.getElementById('provider-select').addEventListener('change', (e) => {
             state.currentProvider = e.target.value;
+            localStorage.setItem('canvas_provider', e.target.value);
             refreshModels();
         });
 
         document.getElementById('model-select').addEventListener('change', (e) => {
+            if (e.target.value === '__START_OLLAMA__') return;
+            if (!e.target.value) return;
             state.currentModel = e.target.value;
+            localStorage.setItem('canvas_model', e.target.value);
             checkSmallModelWarning();
         });
 
@@ -2407,6 +2596,7 @@ body { background: #111; overflow: hidden; }
         });
 
         document.getElementById('apply-html-btn').addEventListener('click', () => {
+            pushUndo();
             const val = document.getElementById('slide-html-editor').value;
             state.slides[state.currentSlideIndex] = val;
             saveSlides();
@@ -2423,8 +2613,8 @@ body { background: #111; overflow: hidden; }
         document.getElementById('theme-select').addEventListener('change', (e) => {
             const newTheme = e.target.value;
             const oldTheme = state.currentTheme;
+            pushUndo();
             state.currentTheme = newTheme;
-            // Apply theme to all existing slides
             state.slides = state.slides.map(html => applyThemeToSlide(html, newTheme));
             saveSlides();
             renderAll();
@@ -2434,6 +2624,7 @@ body { background: #111; overflow: hidden; }
             if (state.slides.length === 0) return;
             const layout = e.target.value;
             if (!layout) return;
+            pushUndo();
             const theme = SLIDE_THEMES[state.currentTheme];
             const v = ':root{--slide-width:960px;--slide-height:540px;--safe-margin:40px;--header-height:90px;--footer-height:40px;}';
             const layouts = {
@@ -2504,6 +2695,15 @@ body { background: #111; overflow: hidden; }
                 } else if (e.key === 'Escape') {
                     endPresentation();
                 }
+                return;
+            }
+            var isInput = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.isContentEditable);
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey && !isInput) {
+                e.preventDefault();
+                undo();
+            } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey)) && !isInput) {
+                e.preventDefault();
+                redo();
             }
         });
 
@@ -2630,6 +2830,12 @@ body { background: #111; overflow: hidden; }
         loadSessions();
         loadLogo();
         loadBrandProfiles();
+        var savedProvider = localStorage.getItem('canvas_provider');
+        var savedModel = localStorage.getItem('canvas_model');
+        if (savedProvider) {
+            state.currentProvider = savedProvider;
+            document.getElementById('provider-select').value = savedProvider;
+        }
         if (state.sessions.length === 0) {
             createSession('Welcome Presentation');
         } else {
