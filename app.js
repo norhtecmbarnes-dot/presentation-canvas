@@ -124,6 +124,7 @@ p{font-size:24px;color:#a0a0b0;}
         sidebarOpen: true,
         settings: {
             ollamaUrl: 'http://localhost:11434',
+            ollamaKey: '',
             openaiKey: '',
             openaiUrl: 'https://api.openai.com/v1',
             openaiModel: 'gpt-4o',
@@ -807,9 +808,11 @@ p{font-size:24px;color:#a0a0b0;}
             var provider = state.currentProvider;
 
             if (provider === 'ollama') {
+                var ollamaHeaders = { 'Content-Type': 'application/json' };
+                if (state.settings.ollamaKey) ollamaHeaders['Authorization'] = 'Bearer ' + state.settings.ollamaKey;
                 var response = await fetch(state.settings.ollamaUrl + '/api/generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: ollamaHeaders,
                     body: JSON.stringify({ model: model, prompt: researchPrompt, stream: false }),
                     signal: AbortSignal.timeout(60000)
                 });
@@ -1002,9 +1005,11 @@ p{font-size:24px;color:#a0a0b0;}
 
     async function fetchOllamaModels() {
         try {
+            var tagsHeaders = { 'Accept': 'application/json' };
+            if (state.settings.ollamaKey) tagsHeaders['Authorization'] = 'Bearer ' + state.settings.ollamaKey;
             const response = await fetch(`${state.settings.ollamaUrl}/api/tags`, {
                 method: 'GET',
-                headers: { 'Accept': 'application/json' }
+                headers: tagsHeaders
             });
             if (!response.ok) {
                 console.error('Ollama API error:', response.status, response.statusText);
@@ -1151,9 +1156,11 @@ p{font-size:24px;color:#a0a0b0;}
     }
 
     async function streamOllama(prompt, systemPrompt, model) {
+        var chatHeaders = { 'Content-Type': 'application/json' };
+        if (state.settings.ollamaKey) chatHeaders['Authorization'] = 'Bearer ' + state.settings.ollamaKey;
         const response = await fetch(`${state.settings.ollamaUrl}/api/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: chatHeaders,
             body: JSON.stringify({ model, messages: buildMessages(systemPrompt, prompt), stream: true }),
             signal: state.abortController.signal
         });
@@ -2717,6 +2724,7 @@ body { background: #111; overflow: hidden; }
 
         document.getElementById('settings-btn').addEventListener('click', () => {
             document.getElementById('ollama-url').value = state.settings.ollamaUrl;
+            document.getElementById('ollama-key').value = state.settings.ollamaKey;
             document.getElementById('openai-key').value = state.settings.openaiKey;
             document.getElementById('openai-url').value = state.settings.openaiUrl;
             document.getElementById('openai-model').value = state.settings.openaiModel;
@@ -2730,6 +2738,7 @@ body { background: #111; overflow: hidden; }
 
         document.getElementById('settings-save-btn').addEventListener('click', () => {
             state.settings.ollamaUrl = document.getElementById('ollama-url').value;
+            state.settings.ollamaKey = document.getElementById('ollama-key').value;
             state.settings.openaiKey = document.getElementById('openai-key').value;
             state.settings.openaiUrl = document.getElementById('openai-url').value;
             state.settings.openaiModel = document.getElementById('openai-model').value;
