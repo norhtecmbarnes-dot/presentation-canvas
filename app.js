@@ -1659,12 +1659,14 @@ CONTENT RULES:
         var result;
         var finalLayoutCheck = '\n\n═══════════════════════════\nFINAL CHECK — READ THIS BEFORE GENERATING SLIDES\n═══════════════════════════\n' +
             'EVERY slide body MUST have: width:960px; height:540px; overflow:hidden;\n' +
-            'EVERY content container MUST have: max-width:880px;\n' +
-            'DO NOT write more than 7 lines of text per slide.\n' +
+            'EVERY content container MUST have: max-width:880px; max-height:410px; overflow:hidden;\n' +
+            'DO NOT write more than 5-6 lines of text per slide.\n' +
             'DO NOT let any text touch the edges — use padding:40px minimum.\n' +
-            'Font sizes: headings 28-48px, body text 14-20px.\n' +
+            'Font sizes: headings 28-42px, body text 14-18px. Use clamp() for responsive sizing.\n' +
             'If a slide has too much content, SPLIT it across multiple slides.\n' +
-            'TEST: can all text fit inside a 960x540 box with 40px padding? If not, reduce content.';
+            'CRITICAL: Content MUST fit inside 960x540 with 40px padding on ALL sides.\n' +
+            'CRITICAL: Text that overflows the slide is UNACCEPTABLE. Reduce font size or split slides.\n' +
+            'Use line-height:1.4-1.6 for body text. Never use font-size above 48px.';
 
         if (mode === 'script') {
             result = basePrompt + finalLayoutCheck + '\n\nMODE: SCRIPT\nFirst output a numbered outline (1. Title, 2. Title...), then output all <<<SLIDE>>> blocks.';
@@ -1756,6 +1758,33 @@ CONTENT RULES:
         return prompt;
     }
 
+    // Post-process slide HTML to prevent text overflow
+    function sanitizeSlideHtml(html) {
+        // Ensure body has overflow:hidden and correct dimensions
+        if (!html.includes('overflow:hidden') && !html.includes('overflow: hidden')) {
+            html = html.replace(/(<body[^>]*style=['"])/, '$1overflow:hidden;');
+        }
+        // Inject overflow protection into <style> if present
+        const overflowCss = [
+            '*{margin:0;padding:0;box-sizing:border-box;}',
+            'body{overflow:hidden!important;width:960px!important;height:540px!important;max-height:540px!important;}',
+            '.content,.container,[class*="content"],[class*="slide"]{max-height:410px!important;overflow:hidden!important;}',
+            'h1{font-size:clamp(20px,4vw,42px)!important;line-height:1.15!important;margin-bottom:8px!important;}',
+            'h2{font-size:clamp(18px,3.5vw,36px)!important;line-height:1.2!important;margin-bottom:6px!important;}',
+            'h3{font-size:clamp(16px,3vw,28px)!important;line-height:1.25!important;}',
+            'p,li,td,th{font-size:clamp(12px,1.8vw,18px)!important;line-height:1.5!important;}',
+            'ul,ol{padding-left:20px!important;}',
+            'li{margin-bottom:2px!important;}',
+            'table{font-size:clamp(10px,1.5vw,16px)!important;width:100%!important;border-collapse:collapse!important;}',
+        ].join('\n');
+        if (html.includes('<style>')) {
+            html = html.replace(/<style>/, '<style>' + overflowCss);
+        } else if (html.includes('<head>')) {
+            html = html.replace('<head>', '<head><style>' + overflowCss + '</style>');
+        }
+        return html;
+    }
+
     function parseSlidesFromResponse(response) {
         const slides = [];
         const slideRegex = /<<<SLIDE>>>([\s\S]*?)<<<END_SLIDE>>>/g;
@@ -1766,13 +1795,13 @@ CONTENT RULES:
             if (!html.startsWith('<!DOCTYPE') && !html.startsWith('<html')) {
                 html = '<!DOCTYPE html>' + html;
             }
-            slides.push(html);
+            slides.push(sanitizeSlideHtml(html));
         }
 
         if (slides.length === 0) {
             const htmlRegex = /<!DOCTYPE\s+html[^>]*>[\s\S]*?<\/html>/gi;
             while ((match = htmlRegex.exec(response)) !== null) {
-                slides.push(match[0].trim());
+                slides.push(sanitizeSlideHtml(match[0].trim()));
             }
         }
 
@@ -1781,7 +1810,7 @@ CONTENT RULES:
             while ((match = bodyRegex.exec(response)) !== null) {
                 const bodyContent = match[1];
                 const t = SLIDE_THEMES[state.currentTheme];
-                slides.push(`<!DOCTYPE html><html><head><style>body{margin:0;padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${t.background};color:${t.color};}</style></head><body>${bodyContent}</body></html>`);
+                slides.push(sanitizeSlideHtml(`<!DOCTYPE html><html><head><style>body{margin:0;padding:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Segoe UI',sans-serif;background:${t.background};color:${t.color};}</style></head><body>${bodyContent}</body></html>`));
             }
         }
 
